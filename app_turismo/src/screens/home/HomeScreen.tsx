@@ -102,8 +102,17 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.placeCardHeader}>
           <Text style={styles.placeCategoryTag}>{item.category.toUpperCase()}</Text>
           <View style={styles.ratingBox}>
-            <Ionicons name="star" size={13} color="#F59E0B" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Ionicons
+                key={star}
+                name={item.rating >= star ? 'star' : item.rating >= star - 0.5 ? 'star-half' : 'star-outline'}
+                size={13}
+                color="#F59E0B"
+              />
+            ))}
+            <Text style={styles.ratingText}>
+              {item.ratingCount > 0 ? `${item.rating.toFixed(1)} (${item.ratingCount})` : '0.0'}
+            </Text>
           </View>
         </View>
         <Text style={styles.placeCardTitle} numberOfLines={1}>

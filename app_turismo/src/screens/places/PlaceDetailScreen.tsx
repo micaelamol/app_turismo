@@ -23,9 +23,10 @@ interface Props {
 
 export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { placeId } = route.params;
-  const { getPlaceById, isFavorite, toggleFavorite, visitedPlaces, markAsVisited } = usePlaces();
+  const { getPlaceById, isFavorite, toggleFavorite, visitedPlaces, markAsVisited, ratePlace } = usePlaces();
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [justRated, setJustRated] = useState<number | null>(null);
 
   const place = getPlaceById(placeId);
 
@@ -47,6 +48,18 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleMarkVisited = () => {
     markAsVisited(place.id);
     Alert.alert('¡Visita Registrada!', `Has guardado tu visita a ${place.title} en tu bitácora.`);
+  };
+
+  const handleRate = (stars: number) => {
+    ratePlace(place.id, stars);
+    setJustRated(stars);
+    Alert.alert('¡Gracias por calificar!', `Le diste ${stars} estrella${stars > 1 ? 's' : ''} a ${place.title}.`);
+  };
+
+  const handleOpenGoogleMaps = () => {
+    const { latitude, longitude } = place.coordinates;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    window?.open ? window.open(url, '_blank') : null;
   };
 
   const handleScroll = (event: any) => {
@@ -115,8 +128,17 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.categoryBadgeText}>{place.category.toUpperCase()}</Text>
             </View>
             <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingBadgeText}>{place.rating} / 5.0</Text>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name={place.rating >= star ? 'star' : place.rating >= star - 0.5 ? 'star-half' : 'star-outline'}
+                  size={14}
+                  color="#F59E0B"
+                />
+              ))}
+              <Text style={styles.ratingBadgeText}>
+                {place.ratingCount > 0 ? `${place.rating.toFixed(1)} (${place.ratingCount})` : 'Sin puntaje aún'}
+              </Text>
             </View>
             <View style={styles.visitBadge}>
               <Ionicons name="eye-outline" size={14} color="#6B7280" />
@@ -129,6 +151,42 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.addressRow}>
             <Ionicons name="location" size={18} color="#4F46E5" />
             <Text style={styles.addressText}>{place.address}</Text>
+          </View>
+
+          {/* ⭐ SECCIÓN INTERACTIVA DE CALIFICACIÓN */}
+          <View style={styles.rateCard}>
+            <View style={styles.rateCardHeader}>
+              <Ionicons name="star" size={20} color="#F59E0B" />
+              <Text style={styles.rateCardTitle}>
+                {place.userRating ? 'Tu calificación para este lugar:' : '¿Visitaste este atractivo? Calificalo:'}
+              </Text>
+            </View>
+            <View style={styles.starTouchRow}>
+              {[1, 2, 3, 4, 5].map((star) => {
+                const currentRating = place.userRating || justRated || 0;
+                const isSelected = star <= currentRating;
+                return (
+                  <TouchableOpacity
+                    key={star}
+                    style={styles.starButton}
+                    onPress={() => handleRate(star)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={isSelected ? 'star' : 'star-outline'}
+                      size={32}
+                      color={isSelected ? '#F59E0B' : '#D1D5DB'}
+                    />
+                    <Text style={[styles.starNumber, isSelected && styles.starNumberActive]}>{star}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={styles.rateCardSub}>
+              {place.userRating
+                ? `Puntaje guardado: ${place.userRating} de 5 estrellas. ¡Tocá para cambiarlo!`
+                : 'Tocá las estrellas para dejar tu voto'}
+            </Text>
           </View>
 
           {/* Reproductor de Audioguía */}
@@ -193,6 +251,14 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.btnActionText}>
                 {isVisited ? '¡Lugar Visitado!' : 'Marcar como Visitado'}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.btnMaps}
+              onPress={handleOpenGoogleMaps}
+            >
+              <Ionicons name="navigate" size={18} color="#fff" />
+              <Text style={styles.btnMapsText}>Cómo Llegar (Ruta GPS)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -472,6 +538,65 @@ const styles = StyleSheet.create({
   },
   btnSecondaryText: {
     color: '#4F46E5',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  rateCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    alignItems: 'center',
+  },
+  rateCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  rateCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#92400E',
+  },
+  starTouchRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  starButton: {
+    alignItems: 'center',
+    padding: 4,
+  },
+  starNumber: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  starNumberActive: {
+    color: '#D97706',
+    fontWeight: 'bold',
+  },
+  rateCardSub: {
+    fontSize: 12,
+    color: '#B45309',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  btnMaps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#059669',
+  },
+  btnMapsText: {
+    color: '#fff',
     fontSize: 15,
     fontWeight: 'bold',
   },

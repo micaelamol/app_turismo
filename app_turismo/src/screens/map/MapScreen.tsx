@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Image,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -17,17 +18,110 @@ interface Props {
 }
 
 export const MapScreen: React.FC<Props> = ({ navigation }) => {
-  const { places, userLocation, categories, selectedCategory, setSelectedCategory } = usePlaces();
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(places[0]);
+  const { filteredPlaces, selectedCategory, setSelectedCategory, categories } = usePlaces();
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(filteredPlaces[0] || null);
+
+  useEffect(() => {
+    if (filteredPlaces.length > 0 && (!selectedPlace || !filteredPlaces.find((p) => p.id === selectedPlace.id))) {
+      setSelectedPlace(filteredPlaces[0]);
+    }
+  }, [filteredPlaces]);
+
+  const handleOpenGoogleMaps = (place: Place) => {
+    const { latitude, longitude } = place.coordinates;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+    window?.open ? window.open(url, '_blank') : null;
+  };
+
+  // Generación del código HTML para el mapa interactivo real con Leaflet & OpenStreetMap
+  const generateMapHtml = () => {
+    const defaultLat = selectedPlace ? selectedPlace.coordinates.latitude : -31.5373;
+    const defaultLng = selectedPlace ? selectedPlace.coordinates.longitude : -68.5252;
+    const zoom = selectedPlace && selectedPlace.category === 'naturaleza' && Math.abs(selectedPlace.coordinates.latitude - (-31.5373)) > 0.5 ? 9 : 12;
+
+    const markersJs = filteredPlaces
+      .map((p) => {
+        const isSel = selectedPlace?.id === p.id;
+        const color = isSel ? '#4F46E5' : '#EF4444';
+        const titleSafe = p.title.replace(/'/g, "\\'");
+        const addrSafe = p.address.replace(/'/g, "\\'");
+        return `
+          (function() {
+            var icon = L.divIcon({
+              className: 'custom-pin',
+              html: '<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">📍</div>',
+              iconSize: [32, 32],
+              iconAnchor: [16, 32]
+            });
+            var m = L.marker([${p.coordinates.latitude}, ${p.coordinates.longitude}], { icon: icon }).addTo(map);
+            m.bindPopup('<b>${titleSafe}</b><br/><span style="color:#666;font-size:12px;">${addrSafe}</span>');
+            m.on('click', function() {
+              window.parent.postMessage({ type: 'SELECT_PLACE', placeId: '${p.id}' }, '*');
+            });
+            ${isSel ? 'm.openPopup();' : ''}
+          })();
+        `;
+      })
+      .join('\n');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          html, body, #map {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #E0E7FF;
+          }
+          .custom-pin {
+            cursor: pointer;
+            transition: transform 0.2s;
+          }
+          .custom-pin:hover {
+            transform: scale(1.15);
+          }
+          .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+            font-family: system-ui, -apple-system, sans-serif;
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map', { zoomControl: true }).setView([${defaultLat}, ${defaultLng}], ${zoom});
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap San Juan'
+          }).addTo(map);
+
+          ${markersJs}
+        </script>
+      </body>
+      </html>
+    `;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header flotante */}
+      {/* Header flotante con categorías */}
       <View style={styles.header}>
-        <Text style={styles.title}>Mapa de la Ciudad</Text>
-        <Text style={styles.subtitle}>Explora monumentos y lugares cerca de tu ubicación</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>Mapa de San Juan</Text>
+            <Text style={styles.subtitle}>20 atractivos geolocalizados con coordenadas GPS reales</Text>
+          </View>
+        </View>
 
-        {/* Filtro rápido horizontal */}
+        {/* Filtro de Categorías */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
           {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id;
@@ -46,79 +140,58 @@ export const MapScreen: React.FC<Props> = ({ navigation }) => {
         </ScrollView>
       </View>
 
-      {/* Visualizador de Mapa / Radar */}
+      {/* Contenedor del Mapa Real */}
       <View style={styles.mapCanvas}>
-        <View style={styles.radarBackground}>
-          <View style={[styles.radarCircle, { width: 320, height: 320, borderRadius: 160 }]} />
-          <View style={[styles.radarCircle, { width: 220, height: 220, borderRadius: 110 }]} />
-          <View style={[styles.radarCircle, { width: 120, height: 120, borderRadius: 60 }]} />
-
-          {/* Posición del Usuario (Punto Azul con pulso) */}
-          <View style={styles.userLocationMarker}>
-            <View style={styles.userPulse} />
-            <View style={styles.userDot} />
+        {Platform.OS === 'web' ? (
+          <iframe
+            title="San Juan Real Map"
+            srcDoc={generateMapHtml()}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+            }}
+          />
+        ) : (
+          <View style={styles.nativeFallback}>
+            <Text style={styles.nativeFallbackText}>Cargando mapa interactivo...</Text>
           </View>
+        )}
 
-          {/* Marcadores de Lugares en el radar / mapa */}
-          {places.map((place, index) => {
-            const isSelected = selectedPlace?.id === place.id;
-            // Posicionamiento distribuido para visualización interactiva
-            const offsets = [
-              { top: 50, left: 70 },
-              { top: 90, right: 60 },
-              { bottom: 90, left: 60 },
-              { bottom: 60, right: 80 },
-              { top: 180, left: 40 },
-              { top: 200, right: 50 },
-            ];
-            const pos = offsets[index % offsets.length];
-
-            return (
-              <TouchableOpacity
-                key={place.id}
-                style={[
-                  styles.placePin,
-                  pos as any,
-                  isSelected && styles.placePinSelected,
-                ]}
-                onPress={() => setSelectedPlace(place)}
-              >
-                <Ionicons
-                  name={isSelected ? 'location' : 'location-outline'}
-                  size={isSelected ? 26 : 20}
-                  color={isSelected ? '#4F46E5' : '#EF4444'}
-                />
-                <View style={[styles.pinLabel, isSelected && styles.pinLabelSelected]}>
-                  <Text style={[styles.pinLabelText, isSelected && styles.pinLabelTextSelected]} numberOfLines={1}>
-                    {place.title.split(' ')[0]}
+        {/* Selector Rápido de Lugares en la parte superior del mapa */}
+        <View style={styles.quickSelectBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}>
+            {filteredPlaces.map((place) => {
+              const isSelected = selectedPlace?.id === place.id;
+              return (
+                <TouchableOpacity
+                  key={place.id}
+                  style={[styles.quickChip, isSelected && styles.quickChipActive]}
+                  onPress={() => setSelectedPlace(place)}
+                >
+                  <Text style={[styles.quickChipText, isSelected && styles.quickChipTextActive]}>
+                    {place.title.split(' ')[0]} {place.title.split(' ')[1] || ''}
                   </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
-
-        {/* Botón de re-centrar GPS */}
-        <TouchableOpacity style={styles.gpsButton}>
-          <Ionicons name="locate" size={22} color="#4F46E5" />
-        </TouchableOpacity>
       </View>
 
       {/* Tarjeta Flotante Inferior con el lugar seleccionado */}
       {selectedPlace && (
         <View style={styles.bottomCardContainer}>
-          <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('PlaceDetail', { placeId: selectedPlace.id })}
-          >
+          <View style={styles.card}>
             <Image source={{ uri: selectedPlace.imageUrl }} style={styles.cardImage} />
             <View style={styles.cardInfo}>
               <View style={styles.cardBadgeRow}>
                 <Text style={styles.cardCategory}>{selectedPlace.category.toUpperCase()}</Text>
-                <View style={styles.distanceBadge}>
-                  <Ionicons name="navigate-outline" size={12} color="#4F46E5" />
-                  <Text style={styles.distanceText}>a 350 m</Text>
+                <View style={styles.ratingBadge}>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.ratingText}>
+                    {selectedPlace.ratingCount > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'}
+                  </Text>
                 </View>
               </View>
 
@@ -130,13 +203,24 @@ export const MapScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
 
               <View style={styles.cardActionRow}>
-                <View style={styles.btnDetail}>
-                  <Text style={styles.btnDetailText}>Ver Guía y Detalles</Text>
-                  <Ionicons name="arrow-forward" size={14} color="#4F46E5" />
-                </View>
+                <TouchableOpacity
+                  style={styles.btnDetail}
+                  onPress={() => navigation.navigate('PlaceDetail', { placeId: selectedPlace.id })}
+                >
+                  <Text style={styles.btnDetailText}>Ver Ficha</Text>
+                  <Ionicons name="arrow-forward" size={13} color="#4F46E5" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.btnNavigate}
+                  onPress={() => handleOpenGoogleMaps(selectedPlace)}
+                >
+                  <Ionicons name="navigate" size={13} color="#fff" />
+                  <Text style={styles.btnNavigateText}>Cómo Llegar</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -146,150 +230,110 @@ export const MapScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 20,
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 6,
-    elevation: 4,
-    zIndex: 10,
+    elevation: 3,
+    zIndex: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#0F172A',
   },
   subtitle: {
-    fontSize: 13,
-    color: '#6B7280',
+    fontSize: 12,
+    color: '#64748B',
     marginTop: 2,
-    marginBottom: 10,
   },
   filterScroll: {
     flexDirection: 'row',
-    marginTop: 4,
+    marginTop: 6,
   },
   filterChip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F1F5F9',
     borderRadius: 16,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E2E8F0',
   },
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#4B5563',
+    color: '#475569',
   },
   filterChipTextActive: {
     color: '#fff',
   },
   mapCanvas: {
     flex: 1,
+    position: 'relative',
     backgroundColor: '#E0E7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
   },
-  radarBackground: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  radarCircle: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  userLocationMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(79, 70, 229, 0.25)',
+  nativeFallback: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  userPulse: {
+  nativeFallbackText: {
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+  quickSelectBar: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#4F46E5',
-    opacity: 0.5,
+    top: 12,
+    left: 0,
+    right: 0,
+    zIndex: 15,
   },
-  userDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4F46E5',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  placePin: {
-    position: 'absolute',
-    alignItems: 'center',
-  },
-  placePinSelected: {
-    transform: [{ scale: 1.2 }],
-    zIndex: 20,
-  },
-  pinLabel: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  pinLabelSelected: {
-    backgroundColor: '#4F46E5',
-  },
-  pinLabelText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#374151',
-  },
-  pinLabelTextSelected: {
-    color: '#fff',
-  },
-  gpsButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: '#fff',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+  quickChip: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  quickChipActive: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  quickChipText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  quickChipTextActive: {
+    color: '#fff',
   },
   bottomCardContainer: {
     position: 'absolute',
     bottom: 16,
     left: 16,
     right: 16,
+    zIndex: 30,
   },
   card: {
     backgroundColor: '#fff',
@@ -297,11 +341,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   cardImage: {
     width: 85,
@@ -311,7 +357,6 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     flex: 1,
-    justifyContent: 'center',
   },
   cardBadgeRow: {
     flexDirection: 'row',
@@ -324,43 +369,62 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#4F46E5',
   },
-  distanceBadge: {
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FEF3C7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     gap: 3,
   },
-  distanceText: {
+  ratingText: {
     fontSize: 10,
-    color: '#4F46E5',
+    color: '#B45309',
     fontWeight: 'bold',
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#0F172A',
     marginBottom: 2,
   },
   cardAddress: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 8,
   },
   cardActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   btnDetail: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#EEF2FF',
   },
   btnDetailText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     color: '#4F46E5',
+  },
+  btnNavigate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#059669',
+  },
+  btnNavigateText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });

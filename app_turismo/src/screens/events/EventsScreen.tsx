@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
+    Alert,
     FlatList,
     Image,
     SafeAreaView,
@@ -17,48 +18,73 @@ interface Props {
 }
 
 export const EventsScreen: React.FC<Props> = ({ navigation }) => {
-  const { events } = usePlaces();
+  const { events, eventReminders, toggleEventReminder } = usePlaces();
   const [selectedFilter, setSelectedFilter] = useState('all');
 
   const filteredEvents =
     selectedFilter === 'all' ? events : events.filter((e) => e.category === selectedFilter);
 
-  const renderEventCard = ({ item }: { item: CityEvent }) => (
-    <View style={styles.eventCard}>
-      <Image source={{ uri: item.imageUrl }} style={styles.eventImage} />
-      <View style={styles.priceTag}>
-        <Text style={styles.priceText}>{item.price}</Text>
+  const handleToggleReminder = (event: CityEvent) => {
+    const isNowReminded = toggleEventReminder(event.id);
+    if (isNowReminded) {
+      Alert.alert(
+        '🔔 ¡Recordatorio Activado!',
+        `Te avisaremos con anticipación antes de: ${event.title} (${event.date} a las ${event.time}).`
+      );
+    } else {
+      Alert.alert('Recordatorio desactivado', `Ya no recibirás alertas de ${event.title}.`);
+    }
+  };
+
+  const renderEventCard = ({ item }: { item: CityEvent }) => {
+    const isReminded = eventReminders.includes(item.id);
+    return (
+      <View style={styles.eventCard}>
+        <Image source={{ uri: item.imageUrl }} style={styles.eventImage} />
+        <View style={styles.priceTag}>
+          <Text style={styles.priceText}>{item.price}</Text>
+        </View>
+
+        <View style={styles.cardContent}>
+          <Text style={styles.eventTitle}>{item.title}</Text>
+
+          <View style={styles.metaRow}>
+            <Ionicons name="calendar-outline" size={14} color="#4F46E5" />
+            <Text style={styles.metaText}>{item.date}</Text>
+          </View>
+
+          <View style={styles.metaRow}>
+            <Ionicons name="time-outline" size={14} color="#4F46E5" />
+            <Text style={styles.metaText}>{item.time}</Text>
+          </View>
+
+          <View style={styles.metaRow}>
+            <Ionicons name="location-outline" size={14} color="#4F46E5" />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {item.location}
+            </Text>
+          </View>
+
+          <Text style={styles.eventDescription}>{item.description}</Text>
+
+          <TouchableOpacity
+            style={[styles.remindButton, isReminded && styles.remindButtonActive]}
+            onPress={() => handleToggleReminder(item)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={isReminded ? 'notifications' : 'notifications-outline'}
+              size={16}
+              color={isReminded ? '#fff' : '#4F46E5'}
+            />
+            <Text style={[styles.remindText, isReminded && styles.remindTextActive]}>
+              {isReminded ? '✓ Recordatorio Activado' : 'Recordarme este evento'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <View style={styles.cardContent}>
-        <Text style={styles.eventTitle}>{item.title}</Text>
-
-        <View style={styles.metaRow}>
-          <Ionicons name="calendar-outline" size={14} color="#4F46E5" />
-          <Text style={styles.metaText}>{item.date}</Text>
-        </View>
-
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={14} color="#4F46E5" />
-          <Text style={styles.metaText}>{item.time}</Text>
-        </View>
-
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={14} color="#4F46E5" />
-          <Text style={styles.metaText} numberOfLines={1}>
-            {item.location}
-          </Text>
-        </View>
-
-        <Text style={styles.eventDescription}>{item.description}</Text>
-
-        <TouchableOpacity style={styles.remindButton}>
-          <Ionicons name="notifications-outline" size={16} color="#4F46E5" />
-          <Text style={styles.remindText}>Recordarme este evento</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -172,5 +198,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
     color: '#4F46E5',
+  },
+  remindButtonActive: {
+    backgroundColor: '#10B981',
+  },
+  remindTextActive: {
+    color: '#fff',
   },
 });

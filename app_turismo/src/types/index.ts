@@ -28,7 +28,9 @@ export interface Place {
   history: string;
   address: string;
   coordinates: Coordinates;
-  rating: number;
+  rating: number; // Promedio actual (0 a 5)
+  ratingCount?: number; // Cantidad total de calificaciones
+  userRating?: number; // Calificación otorgada por el usuario actual
   imageUrl: string;
   images?: string[]; // Carrusel de fotos múltiples
   audioGuideTitle?: string;

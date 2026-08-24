@@ -15,6 +15,10 @@ interface PlacesContextType {
   isFavorite: (placeId: string) => boolean;
   visitedPlaces: string[];
   markAsVisited: (placeId: string) => void;
+  userRatings: Record<string, number>;
+  ratePlace: (placeId: string, rating: number) => void;
+  eventReminders: string[];
+  toggleEventReminder: (eventId: string) => boolean;
   userLocation: Coordinates;
   setUserLocation: (coords: Coordinates) => void;
   filteredPlaces: Place[];
@@ -26,8 +30,6 @@ interface PlacesContextType {
 const PlacesContext = createContext<PlacesContextType | undefined>(undefined);
 
 export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Conectamos directamente con mockData para actualización instantánea
-  const places = PLACES;
   const categories = CATEGORIES;
   const events = EVENTS;
 
@@ -35,11 +37,31 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [favorites, setFavorites] = useState<string[]>(['p0', 'p1', 'p2']);
   const [visitedPlaces, setVisitedPlaces] = useState<string[]>(['p0']);
+  const [userRatings, setUserRatings] = useState<Record<string, number>>({});
+  const [eventReminders, setEventReminders] = useState<string[]>([]);
 
   // Ubicación inicial por defecto: Centro de San Juan, Argentina (Plaza 25 de Mayo)
   const [userLocation, setUserLocation] = useState<Coordinates>({
     latitude: -31.5373,
     longitude: -68.5252,
+  });
+
+  // Los lugares inician en 0 para reflejar que la app es nueva y se calculan según las opiniones
+  const places: Place[] = PLACES.map((p) => {
+    const userRating = userRatings[p.id];
+    if (userRating !== undefined) {
+      return {
+        ...p,
+        rating: userRating,
+        ratingCount: 1,
+        userRating,
+      };
+    }
+    return {
+      ...p,
+      rating: 0,
+      ratingCount: 0,
+    };
   });
 
   const toggleFavorite = (placeId: string) => {
@@ -56,6 +78,24 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const ratePlace = (placeId: string, rating: number) => {
+    setUserRatings((prev) => ({
+      ...prev,
+      [placeId]: rating,
+    }));
+  };
+
+  const toggleEventReminder = (eventId: string): boolean => {
+    const isAlreadyReminded = eventReminders.includes(eventId);
+    if (isAlreadyReminded) {
+      setEventReminders((prev) => prev.filter((id) => id !== eventId));
+      return false;
+    } else {
+      setEventReminders((prev) => [...prev, eventId]);
+      return true;
+    }
+  };
+
   const getPlaceById = (id: string) => places.find((p) => p.id === id);
 
   const getEventById = (id: string) => events.find((e) => e.id === id);
@@ -67,7 +107,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const matchesCategory =
       selectedCategory === 'all' ||
       place.category === selectedCategory ||
-      (selectedCategory === 'parques' && place.category === 'naturaleza'); // Permite que parques y naturaleza se vinculen
+      (selectedCategory === 'parques' && place.category === 'naturaleza');
     const matchesSearch =
       place.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       place.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -90,6 +130,10 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isFavorite,
         visitedPlaces,
         markAsVisited,
+        userRatings,
+        ratePlace,
+        eventReminders,
+        toggleEventReminder,
         userLocation,
         setUserLocation,
         filteredPlaces,
@@ -110,3 +154,4 @@ export const usePlaces = (): PlacesContextType => {
   }
   return context;
 };
+
