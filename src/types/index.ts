@@ -54,10 +54,22 @@ export interface CityEvent {
   price: string;
 }
 
+export interface Review {
+  id: string;
+  placeId: string;
+  userName: string;
+  userAvatar?: string;
+  rating: number;
+  date: string;
+  comment: string;
+  photos?: string[];
+}
+
 export type RootStackParamList = {
   Auth: undefined;
   MainTabs: undefined;
   PlaceDetail: { placeId: string };
+  AddReview: { placeId: string };
   EventDetail: { eventId: string };
 };
 

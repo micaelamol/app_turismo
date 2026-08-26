@@ -5,13 +5,17 @@ import {
     Dimensions,
     FlatList,
     Image,
+    Linking,
+    Modal,
     SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
 import { usePlaces } from '../../context/PlacesContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -23,12 +27,29 @@ interface Props {
 
 export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { placeId } = route.params;
-  const { getPlaceById, isFavorite, toggleFavorite, visitedPlaces, markAsVisited, ratePlace } = usePlaces();
-  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const { user } = useAuth();
+  const {
+    getPlaceById,
+    isFavorite,
+    toggleFavorite,
+    visitedPlaces,
+    markAsVisited,
+    ratePlace,
+    getReviewsByPlaceId,
+    addReview,
+  } = usePlaces();
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [justRated, setJustRated] = useState<number | null>(null);
 
+  // Estados del Formulario de Experiencias y Fotos
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
+  const [modalRating, setModalRating] = useState(5);
+  const [modalComment, setModalComment] = useState('');
+  const [modalPhoto, setModalPhoto] = useState('');
+
   const place = getPlaceById(placeId);
+  const placeReviews = getReviewsByPlaceId(placeId);
 
   if (!place) {
     return (
@@ -41,13 +62,12 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const isVisited = visitedPlaces.includes(place.id);
   const galleryImages = place.images && place.images.length > 0 ? place.images : [place.imageUrl];
 
-  const handleAudioPlay = () => {
-    setIsPlayingAudio(!isPlayingAudio);
-  };
-
   const handleMarkVisited = () => {
     markAsVisited(place.id);
-    Alert.alert('¡Visita Registrada!', `Has guardado tu visita a ${place.title} en tu bitácora.`);
+    Alert.alert(
+      '¡Visita Registrada! 🎉',
+      `Has guardado tu visita a "${place.title}".\n\nPodés ver todo tu historial de visitas en la pestaña Perfil > Bitácora de Visitas.`
+    );
   };
 
   const handleRate = (stars: number) => {
@@ -56,10 +76,33 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     Alert.alert('¡Gracias por calificar!', `Le diste ${stars} estrella${stars > 1 ? 's' : ''} a ${place.title}.`);
   };
 
+  const handlePublishReview = () => {
+    if (!modalComment.trim()) {
+      Alert.alert('Escribe un comentario', 'Por favor comparte qué tal fue tu experiencia o un consejo para otros viajeros.');
+      return;
+    }
+
+    addReview(
+      place.id,
+      user?.name || 'Turista Explorador',
+      user?.avatar,
+      modalRating,
+      modalComment.trim(),
+      modalPhoto.trim() || undefined
+    );
+
+    setIsReviewModalVisible(false);
+    setModalComment('');
+    setModalPhoto('');
+    Alert.alert('¡Experiencia Publicada! 📸', 'Tu reseña y foto ya son visibles para toda la comunidad.');
+  };
+
   const handleOpenGoogleMaps = () => {
     const { latitude, longitude } = place.coordinates;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    window?.open ? window.open(url, '_blank') : null;
+    Linking.openURL(url).catch((err) => {
+      console.error('Error abriendo mapa:', err);
+    });
   };
 
   const handleScroll = (event: any) => {
@@ -189,25 +232,6 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </Text>
           </View>
 
-          {/* Reproductor de Audioguía */}
-          {place.audioGuideTitle && (
-            <View style={styles.audioPlayerCard}>
-              <View style={styles.audioIconBox}>
-                <Ionicons name="headset-outline" size={24} color="#4F46E5" />
-              </View>
-              <View style={styles.audioTextInfo}>
-                <Text style={styles.audioLabel}>AUDIOGUÍA DISPONIBLE</Text>
-                <Text style={styles.audioTitle} numberOfLines={1}>
-                  {place.audioGuideTitle}
-                </Text>
-                <Text style={styles.audioDuration}>{place.audioDuration || '3:30 min'}</Text>
-              </View>
-              <TouchableOpacity style={styles.playButton} onPress={handleAudioPlay}>
-                <Ionicons name={isPlayingAudio ? 'pause' : 'play'} size={22} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
-
           {/* Descripción */}
           <View style={styles.section}>
             <Text style={styles.sectionHeading}>Descripción</Text>
@@ -237,6 +261,74 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           </View>
 
+          {/* 📸 SECCIÓN: EXPERIENCIAS & FOTOS DE TURISTAS */}
+          <View style={styles.section}>
+            <View style={styles.experiencesHeader}>
+              <View>
+                <Text style={styles.sectionHeading}>Experiencias & Fotos</Text>
+                <Text style={styles.experiencesSub}>
+                  {placeReviews.length > 0
+                    ? `${placeReviews.length} opiniones de viajeros`
+                    : 'Sé el primero en compartir tu experiencia'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.btnAddReview}
+                onPress={() => setIsReviewModalVisible(true)}
+              >
+                <Ionicons name="camera" size={16} color="#fff" />
+                <Text style={styles.btnAddReviewText}>Dejar Reseña / Foto</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Listado de Experiencias de Turistas */}
+            {placeReviews.length === 0 ? (
+              <View style={styles.emptyReviewsCard}>
+                <Ionicons name="chatbubbles-outline" size={32} color="#9CA3AF" />
+                <Text style={styles.emptyReviewsTitle}>Aún no hay opiniones con fotos</Text>
+                <Text style={styles.emptyReviewsText}>
+                  ¿Visitaste este lugar? ¡Comparte tu foto y consejo para otros turistas!
+                </Text>
+              </View>
+            ) : (
+              placeReviews.map((rev) => (
+                <View key={rev.id} style={styles.reviewCard}>
+                  <View style={styles.reviewUserRow}>
+                    <Image
+                      source={{ uri: rev.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' }}
+                      style={styles.reviewAvatar}
+                    />
+                    <View style={styles.reviewUserInfo}>
+                      <Text style={styles.reviewUserName}>{rev.userName}</Text>
+                      <Text style={styles.reviewDate}>{rev.date}</Text>
+                    </View>
+                    <View style={styles.reviewStars}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Ionicons
+                          key={s}
+                          name={rev.rating >= s ? 'star' : 'star-outline'}
+                          size={12}
+                          color="#F59E0B"
+                        />
+                      ))}
+                    </View>
+                  </View>
+
+                  <Text style={styles.reviewComment}>{rev.comment}</Text>
+
+                  {/* Fotos subidas por el usuario */}
+                  {rev.photos && rev.photos.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.reviewPhotosRow}>
+                      {rev.photos.map((photoUri, pIdx) => (
+                        <Image key={pIdx} source={{ uri: photoUri }} style={styles.reviewPhotoItem} />
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              ))
+            )}
+          </View>
+
           {/* Botones de Acción */}
           <View style={styles.buttonGroup}>
             <TouchableOpacity
@@ -263,7 +355,7 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
             <TouchableOpacity
               style={styles.btnSecondary}
-              onPress={() => navigation.navigate('ScannerTab')}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'ScannerTab' })}
             >
               <Ionicons name="qr-code" size={18} color="#4F46E5" />
               <Text style={styles.btnSecondaryText}>Escanear Tótem QR</Text>
@@ -271,6 +363,93 @@ export const PlaceDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* 📸 MODAL: PUBLICAR EXPERIENCIA Y FOTO */}
+      <Modal
+        visible={isReviewModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsReviewModalVisible(false)}
+      >
+        <View style={styles.reviewModalOverlay}>
+          <View style={styles.reviewModalContent}>
+            <View style={styles.reviewModalHeader}>
+              <Text style={styles.reviewModalTitle}>Compartir mi Experiencia</Text>
+              <TouchableOpacity onPress={() => setIsReviewModalVisible(false)}>
+                <Ionicons name="close-circle" size={24} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.formLabel}>1. ¿Cómo calificarías este lugar?</Text>
+              <View style={styles.modalStarsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <TouchableOpacity key={s} onPress={() => setModalRating(s)}>
+                    <Ionicons
+                      name={s <= modalRating ? 'star' : 'star-outline'}
+                      size={32}
+                      color="#F59E0B"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.formLabel}>2. Tu Comentario / Consejo para otros turistas:</Text>
+              <TextInput
+                style={styles.formTextInput}
+                placeholder="Cuenta tu experiencia: ¿Qué tal el lugar? ¿Recomiendas algún horario o qué llevar?..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={4}
+                value={modalComment}
+                onChangeText={setModalComment}
+              />
+
+              <Text style={styles.formLabel}>3. Adjuntar Foto de tu visita (Opcional):</Text>
+              <View style={styles.photoPresetsRow}>
+                <TouchableOpacity
+                  style={[styles.photoPresetBtn, modalPhoto === 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80' && styles.photoPresetBtnActive]}
+                  onPress={() => setModalPhoto('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80')}
+                >
+                  <Ionicons name="camera-outline" size={16} color="#4F46E5" />
+                  <Text style={styles.photoPresetText}>Foto de Paisaje</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.photoPresetBtn, modalPhoto === 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80' && styles.photoPresetBtnActive]}
+                  onPress={() => setModalPhoto('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80')}
+                >
+                  <Ionicons name="person-outline" size={16} color="#4F46E5" />
+                  <Text style={styles.photoPresetText}>Selfie / Recuerdo</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TextInput
+                style={styles.photoUrlInput}
+                placeholder="O pega el enlace de tu foto..."
+                placeholderTextColor="#9CA3AF"
+                value={modalPhoto}
+                onChangeText={setModalPhoto}
+              />
+
+              {modalPhoto ? (
+                <View style={styles.photoPreviewBox}>
+                  <Image source={{ uri: modalPhoto }} style={styles.photoPreviewImg} />
+                  <TouchableOpacity style={styles.btnRemovePhoto} onPress={() => setModalPhoto('')}>
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: 'bold' }}>Quitar Foto</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              <TouchableOpacity style={styles.btnSubmitReview} onPress={handlePublishReview}>
+                <Ionicons name="send" size={16} color="#fff" />
+                <Text style={styles.btnSubmitReviewText}>Publicar Experiencia</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

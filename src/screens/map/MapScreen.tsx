@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
     Image,
+    Linking,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -30,7 +31,9 @@ export const MapScreen: React.FC<Props> = ({ navigation }) => {
   const handleOpenGoogleMaps = (place: Place) => {
     const { latitude, longitude } = place.coordinates;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    window?.open ? window.open(url, '_blank') : null;
+    Linking.openURL(url).catch((err) => {
+      console.error('Error abriendo mapa:', err);
+    });
   };
 
   // Generación del código HTML para el mapa interactivo real con Leaflet & OpenStreetMap

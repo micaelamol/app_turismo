@@ -35,7 +35,14 @@ export const FavoritesScreen: React.FC<Props> = ({ navigation }) => {
     >
       <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
       <View style={styles.itemInfo}>
-        <Text style={styles.itemCategory}>{item.category.toUpperCase()}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <Text style={styles.itemCategory}>{item.category.toUpperCase()}</Text>
+          {activeTab === 'visited' && (
+            <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+              <Text style={{ fontSize: 9, color: '#065F46', fontWeight: 'bold' }}>✓ VISITADO</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.itemTitle} numberOfLines={1}>
           {item.title}
         </Text>
