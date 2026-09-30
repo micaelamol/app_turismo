@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CATEGORIES, EVENTS, PLACES } from '../data/mockData';
 import { Category, CityEvent, Coordinates, Place, Review } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface PlacesContextType {
   places: Place[];
@@ -43,7 +44,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [userRatings, setUserRatings] = useState<Record<string, number>>({});
   const [eventReminders, setEventReminders] = useState<string[]>([]);
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
   // Cargar datos persistidos al montar
   useEffect(() => {
@@ -166,11 +167,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
   const isFavorite = (placeId: string) => favorites.includes(placeId);
 
-  const markAsVisited = (placeId: string) => {
-    if (!visitedPlaces.includes(placeId)) {
-      setVisitedPlaces((prev) => [...prev, placeId]);
-    }
-  };
+  
 
   const ratePlace = (placeId: string, rating: number) => {
     setUserRatings((prev) => ({
