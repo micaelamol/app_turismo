@@ -26,16 +26,22 @@
         "READ_EXTERNAL_STORAGE"
       ]
     },
+    "scheme": "gestorvisitas",
     "plugins": [
+      "expo-router",
       [
         "expo-camera",
         {
           "cameraPermission": "Permite el uso de la cámara para escanear tótems y tomar fotos de tus visitas."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-secure-store"
     ],
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     }
   }
 }
+

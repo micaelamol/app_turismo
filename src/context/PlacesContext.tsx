@@ -68,13 +68,13 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  /* const markAsVisited = (placeId: string) => {
+   const markAsVisited = (placeId: string) => {
     if (!visitedPlaces.includes(placeId)) {
       const newList = [...visitedPlaces, placeId];
       setVisitedPlaces(newList);
       persistVisited(newList);
     }
-  }; */
+  }; 
   const [userLocation, setUserLocation] = useState<Coordinates>({
     latitude: -31.5373,
     longitude: -68.5252,
@@ -166,11 +166,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const isFavorite = (placeId: string) => favorites.includes(placeId);
 
-  const markAsVisited = (placeId: string) => {
-    if (!visitedPlaces.includes(placeId)) {
-      setVisitedPlaces((prev) => [...prev, placeId]);
-    }
-  };
+  
 
   const ratePlace = (placeId: string, rating: number) => {
     setUserRatings((prev) => ({
