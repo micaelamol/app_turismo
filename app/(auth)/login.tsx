@@ -11,26 +11,52 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter } from 'expo-router'; // Migrado a Expo Router
-import { useAuth } from '../../src/context/AuthContext'; // Ruta corregida hacia src
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function LoginScreen() {
-  const router = useRouter(); // Instanciamos el router nativo
+  const router = useRouter();
   const { login } = useAuth();
-  const [email, setEmail] = useState('turista@sanjuan.gob.ar');
-  const [password, setPassword] = useState('123456');
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'turista' | 'habitante'>('turista');
 
-  const handleLogin = () => {
-    if (login) {
-      login(email, selectedRole);
+  const handleLogin = async () => {
+    const emailLimpio = email.trim();
+
+    // 1. Validar que el email no esté vacío
+    if (!emailLimpio) {
+      Alert.alert('Campo obligatorio', 'Por favor, escribe tu correo electrónico.');
+      return;
     }
-    // Redirección nativa al grupo de pestañas tras autenticarse
-    router.replace('/(tabs)');
+
+    // 2. Validar formato del email
+    if (!/^\S+@\S+\.\S+$/.test(emailLimpio)) {
+      Alert.alert('Correo inválido', 'Escribe un correo electrónico válido.');
+      return;
+    }
+
+    // 3. Validar que la contraseña no esté vacía
+    if (!password) {
+      Alert.alert('Campo obligatorio', 'Por favor, escribe tu contraseña.');
+      return;
+    }
+
+    // 4. Iniciar sesión y navegar solo si no hubo error
+    try {
+      setLoading(true);
+      await login(emailLimpio, selectedRole);
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', 'No se pudo iniciar sesión. Revisa tus datos.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGuestLogin = () => {
-    // Requerimiento técnico: Permitir mirar mapas y lugares sin obligar a crear cuenta
     router.replace('/(tabs)');
   };
 
@@ -90,6 +116,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
         </View>
@@ -104,27 +131,29 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              autoCapitalize="none"
             />
           </View>
         </View>
 
-        {/* Fila de acciones principales con Huella/Rostro */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
-            <Text style={styles.primaryButtonText}>Ingresar</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && { opacity: 0.6 }]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>{loading ? 'Ingresando...' : 'Ingresar'}</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
 
-          {/* Requerimiento Técnico: Botón de acceso rápido biométrico */}
-          <TouchableOpacity 
-            style={styles.biometricButton} 
+          <TouchableOpacity
+            style={styles.biometricButton}
             onPress={() => Alert.alert('Acceso Biométrico', 'Iniciando reconocimiento de huella o rostro con SecureStore...')}
           >
             <Ionicons name="finger-print" size={24} color="#4F46E5" />
           </TouchableOpacity>
         </View>
 
-        {/* Requerimiento de pliego: Entrar directo al mapa como invitado */}
         <TouchableOpacity style={styles.secondaryButton} onPress={handleGuestLogin}>
           <Text style={styles.secondaryButtonText}>Explorar como Invitado</Text>
           <Ionicons name="map-outline" size={16} color="#4F46E5" />
