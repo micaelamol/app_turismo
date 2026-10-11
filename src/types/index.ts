@@ -65,23 +65,4 @@ export interface Review {
   photos?: string[];
 }
 
-export type RootStackParamList = {
-  Auth: undefined;
-  MainTabs: undefined;
-  PlaceDetail: { placeId: string };
-  AddReview: { placeId: string };
-  EventDetail: { eventId: string };
-};
 
-export type AuthStackParamList = {
-  Login: undefined;
-  Register: undefined;
-};
-
-export type MainTabParamList = {
-  HomeTab: undefined;
-  MapTab: undefined;
-  ScannerTab: undefined;
-  EventsTab: undefined;
-  FavoritesTab: undefined;
-};
