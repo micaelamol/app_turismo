@@ -218,7 +218,8 @@ export default function MapScreen() {
                 <View style={styles.ratingBadge}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
                   <Text style={styles.ratingText}>
-                    {selectedPlace.ratingCount > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'}
+                    {/* {selectedPlace.ratingCount > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'} */}
+                    {(selectedPlace.ratingCount ?? 0) > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'}
                   </Text>
                 </View>
               </View>
@@ -233,12 +234,13 @@ export default function MapScreen() {
               <View style={styles.cardActionRow}>
                 <TouchableOpacity
                   style={styles.btnDetail}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/PlaceDetail',
-                      params: { placeId: selectedPlace.id },
-                    } as any)
-                  }
+                  onPress={() => router.push(`/place/${selectedPlace.id}`)}
+                  // onPress={() =>
+                  //   router.push({
+                  //     pathname: '/PlaceDetail',
+                  //     params: { placeId: selectedPlace.id },
+                  //   } as any)
+                  // }
                 >
                   <Text style={styles.btnDetailText}>Ver Detalle</Text>
                 </TouchableOpacity>

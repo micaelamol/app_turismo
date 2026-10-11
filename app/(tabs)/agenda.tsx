@@ -1,26 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router'; // Importado para Expo Router
-import { usePlaces } from '../../src/context/PlacesContext'; // Ruta corregida hacia tu src
-import { CityEvent } from '../../src/types'; // Ruta corregida hacia tu src
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePlaces } from '../../src/context/PlacesContext';
+import { CityEvent } from '../../src/types';
 
 export default function EventsScreen() {
-  const router = useRouter(); // Instanciamos el router por si se requiere a futuro
   const { events, eventReminders, toggleEventReminder } = usePlaces();
   const [selectedFilter, setSelectedFilter] = useState('all');
 
   const filteredEvents =
-    selectedFilter === 'all' ? events : events.filter((e) => e.category === selectedFilter);
+    selectedFilter === 'all'
+      ? events
+      : events.filter((e: CityEvent) => e.category === selectedFilter);
 
   const handleToggleReminder = (event: CityEvent) => {
     const isNowReminded = toggleEventReminder(event.id);
@@ -85,7 +85,7 @@ export default function EventsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Eventos & Actividades</Text>
         <Text style={styles.subtitle}>Descubre qué está pasando en la ciudad hoy</Text>
@@ -94,7 +94,7 @@ export default function EventsScreen() {
       <FlatList
         data={filteredEvents}
         renderItem={renderEventCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: CityEvent) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       />
@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingTop: 24,
+    paddingTop: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',

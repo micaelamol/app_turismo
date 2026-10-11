@@ -30,12 +30,13 @@ export default function ProfileScreen() {
     <TouchableOpacity
       style={styles.itemCard}
       activeOpacity={0.85}
-      onPress={() =>
-        router.push({
-          pathname: '/PlaceDetail',
-          params: { placeId: item.id },
-        } as any)
-      }
+      // onPress={() =>
+      //   router.push({
+      //     pathname: '/PlaceDetail',
+      //     params: { placeId: item.id },
+      //   } as any)
+      // }
+      onPress={() => router.push(`/place/${item.id}`)}
     >
       <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
       <View style={styles.itemInfo}>

@@ -1,37 +1,43 @@
-// app/(tabs)/recorrido.tsx
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, SafeAreaView, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router'; // Migrado a Expo Router
-import { usePlaces } from '../../src/context/PlacesContext'; // Ruta corregida hacia src
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import {
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePlaces } from '../../src/context/PlacesContext';
+import { Place } from '../../src/types';
 
 export default function VisitedScreen() {
   const { visitedPlaces, getPlaceById } = usePlaces();
-  const router = useRouter(); // Instanciamos el router nativo
+  const router = useRouter();
 
-  const visitedData = visitedPlaces
-    .map((id) => getPlaceById(id))
-    .filter((place): place is any => !!place);
+  const visitedData: Place[] = visitedPlaces
+    .map((id: string) => getPlaceById(id))
+    .filter((place: Place | undefined): place is Place => !!place);
 
-  const renderItem = ({ item }: { item: any }) => (
+  const renderItem = ({ item }: { item: Place }) => (
     <TouchableOpacity
       style={styles.card}
-      //  Redirección nativa enviando el id por objeto de parámetros 
-      onPress={() => router.push({
-        pathname: '/PlaceDetail',
-        params: { placeId: item.id }
-      })}
+      onPress={() => router.push(`/place/${item.id}`)}
     >
       <Image source={{ uri: item.imageUrl }} style={styles.thumbnail} />
       <View style={styles.info}>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.subtitle}>{item.location}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>
+          {item.address}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.heading}>Historial de Lugares Visitados</Text>
       {visitedData.length === 0 ? (
         <View style={styles.empty}>
@@ -41,7 +47,7 @@ export default function VisitedScreen() {
       ) : (
         <FlatList
           data={visitedData}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Place) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
         />
@@ -62,4 +68,3 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyText: { marginTop: 12, fontSize: 16, color: '#6B7280', textAlign: 'center' },
 });
-

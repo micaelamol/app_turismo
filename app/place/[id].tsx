@@ -19,8 +19,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../src/context/AuthContext';
-import { usePlaces } from '../src/context/PlacesContext';
+import { useAuth } from '../../src/context/AuthContext';
+import { usePlaces } from '../../src/context/PlacesContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,7 +28,7 @@ export default function PlaceDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const placeId = params.placeId as string;
+  const placeId = params.id as string;
 
   const { user } = useAuth();
   const {

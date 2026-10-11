@@ -35,12 +35,16 @@ export default function HomeScreen() {
 
   const featuredPlaces = places.filter((p: Place) => p.isFeatured);
 
-  const goToDetail = (id: string) => {
-    router.push({
-      pathname: '/PlaceDetail',
-      params: { placeId: id },
-    } as any);
-  };
+  // const goToDetail = (id: string) => {
+  //   router.push({
+  //     pathname: '/PlaceDetail',
+  //     params: { placeId: id },
+  //   } as any);
+  // };
+
+     const goToDetail = (id: string) => {
+       router.push(`/place/${id}`);
+     };
 
   const renderCategoryItem = ({ item }: { item: any }) => {
     const isSelected = selectedCategory === item.id;
