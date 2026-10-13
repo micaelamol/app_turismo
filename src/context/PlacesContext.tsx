@@ -14,7 +14,8 @@ interface PlacesContextType {
   toggleFavorite: (placeId: string) => void;
   isFavorite: (placeId: string) => boolean;
   visitedPlaces: string[];
-  markAsVisited: (placeId: string) => void;
+  /* markAsVisited: (placeId: string) => void; */
+  toggleVisited: (placeId: string) => boolean;
   userRatings: Record<string, number>;
   ratePlace: (placeId: string, rating: number) => void;
   reviews: Review[];
@@ -68,13 +69,22 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-   const markAsVisited = (placeId: string) => {
+   /* const markAsVisited = (placeId: string) => {
     if (!visitedPlaces.includes(placeId)) {
       const newList = [...visitedPlaces, placeId];
       setVisitedPlaces(newList);
       persistVisited(newList);
     }
-  }; 
+  };  */
+
+  const toggleVisited = (placeId:string):boolean=>{
+    const isAlreadyVisited = visitedPlaces.includes(placeId);
+    const newList = isAlreadyVisited ? visitedPlaces.filter((id)=> id !== placeId) : [...visitedPlaces, placeId];
+    setVisitedPlaces(newList)
+    persistVisited(newList);
+    return !isAlreadyVisited;
+  }
+  
   const [userLocation, setUserLocation] = useState<Coordinates>({
     latitude: -31.5373,
     longitude: -68.5252,
@@ -219,7 +229,8 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         toggleFavorite,
         isFavorite,
         visitedPlaces,
-        markAsVisited,
+        /* markAsVisited, */
+        toggleVisited,
         userRatings,
         ratePlace,
         reviews,

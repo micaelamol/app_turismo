@@ -36,7 +36,8 @@ export default function PlaceDetailScreen() {
     isFavorite,
     toggleFavorite,
     visitedPlaces,
-    markAsVisited,
+    /* markAsVisited, */
+    toggleVisited,
     ratePlace,
     getReviewsByPlaceId,
     addReview,
@@ -72,14 +73,27 @@ export default function PlaceDetailScreen() {
   const galleryImages: string[] =
     place.images && place.images.length > 0 ? place.images : [place.imageUrl];
 
-  const handleMarkVisited = () => {
+  /* const handleMarkVisited = () => {
     markAsVisited(place.id);
     Alert.alert(
       '¡Visita Registrada! 🎉',
       `Has guardado tu visita a "${place.title}".\n\nPodés ver todo tu historial de visitas en la pestaña Perfil > Bitácora de Visitas.`
     );
-  };
+  }; */
 
+  const handleToggleVisited = () => {
+    const ahoraVisitado = toggleVisited(place.id)
+    if (ahoraVisitado){
+      Alert.alert('¡Visita Registrada! 🎉',
+        "has guardado tu visista a, "+`${place.title}`+". \n\nPodes ver todo tu historial de visitas en la pestaña perfil > bitacora visitas"  
+      );
+    
+    }else{
+      Alert.alert('Visita Eliminada',
+        'Quitamos, '+`${place.title}`+' ,de tu bitacora'
+      )
+    }
+  }
   const handleRate = (stars: number) => {
     ratePlace(place.id, stars);
     setJustRated(stars);
@@ -265,7 +279,8 @@ export default function PlaceDetailScreen() {
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={[styles.btnAccion, isVisited && styles.btnAccionActive]}
-              onPress={handleMarkVisited}
+              /* onPress={handleMarkVisited} */
+              onPress={handleToggleVisited}
             >
               <Ionicons
                 name={isVisited ? 'checkmark-circle' : 'footsteps-outline'}
@@ -273,7 +288,8 @@ export default function PlaceDetailScreen() {
                 color={isVisited ? '#fff' : '#4F46E5'}
               />
               <Text style={[styles.btnAccionText, isVisited && styles.btnAccionTextActive]}>
-                {isVisited ? 'Lugar Visitado' : 'Marcar Visitado'}
+                
+                    {isVisited ? 'Quitar de visitados' : 'Marcar Visitado'} 
               </Text>
             </TouchableOpacity>
 

@@ -23,6 +23,7 @@ export const PLACES: Place[] = [
       longitude: -67.8333,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://www.plataforma10.com.ar/viajes/wp-content/uploads/2024/07/san-juan-argentina.jpg',
     images: [
       'https://www.plataforma10.com.ar/viajes/wp-content/uploads/2024/07/san-juan-argentina.jpg',
@@ -48,6 +49,7 @@ export const PLACES: Place[] = [
       longitude: -68.618,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://tse1.mm.bing.net/th/id/OIP.ykWY8ptD_NMMhGWFYUIlTAHaFj?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
     // 📸 CARRUSEL DE FOTOS OFICIALES DE BODEGA MERCED DEL ESTERO
     images: [
@@ -76,6 +78,7 @@ export const PLACES: Place[] = [
       longitude: -68.562,
     },
     rating: 4.8,
+    ratingCount:0,
     imageUrl: 'https://media.sanjuan8.com/p/931b186eebe31460d847beb7fcbb4405/adjuntos/303/imagenes/006/494/0006494561/1200x675/smart/0023740189jpg.jpg',
     images: [
       'https://media.sanjuan8.com/p/931b186eebe31460d847beb7fcbb4405/adjuntos/303/imagenes/006/494/0006494561/1200x675/smart/0023740189jpg.jpg',
@@ -102,6 +105,7 @@ export const PLACES: Place[] = [
       longitude: -68.5306,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://www.estadiosdeargentina.com.ar/wp-content/uploads/2014/03/estadio-san-juan-bicentenario2.jpg',
     images: [
       'https://www.estadiosdeargentina.com.ar/wp-content/uploads/2014/03/estadio-san-juan-bicentenario2.jpg',
@@ -127,6 +131,7 @@ export const PLACES: Place[] = [
       longitude: -68.536,
     },
     rating: 4.8,
+    ratingCount:0,
     imageUrl: 'https://live.staticflickr.com/1504/24233705371_bbe8760e48_b.jpg',
     images: [
       'https://live.staticflickr.com/1504/24233705371_bbe8760e48_b.jpg',
@@ -152,6 +157,7 @@ export const PLACES: Place[] = [
       longitude: -70.1114,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://andinomercedario.org.ar/wp-content/uploads/2024/05/MERCEDARIO-scaled.jpg',
     images: [
       'https://andinomercedario.org.ar/wp-content/uploads/2024/05/MERCEDARIO-scaled.jpg',
@@ -178,6 +184,7 @@ export const PLACES: Place[] = [
       longitude: -68.25,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1d/a0/53/40/caption.jpg?w=1200&h=1200&s=1',
     images: [
       'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/1d/a0/53/40/caption.jpg?w=1200&h=1200&s=1',
@@ -204,6 +211,7 @@ export const PLACES: Place[] = [
       longitude: -69.8333,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://www.sanjuanturismo.com.ar/img/paso-agua-negra-san-juan.jpg',
     images: [
       'https://www.sanjuanturismo.com.ar/img/paso-agua-negra-san-juan.jpg',
@@ -229,6 +237,7 @@ export const PLACES: Place[] = [
       longitude: -68.7972,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://tse1.mm.bing.net/th/id/OIP.GlhMfDkwJxytL9JHM6yMqwHaEK?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
     images: [
       'https://tse1.mm.bing.net/th/id/OIP.GlhMfDkwJxytL9JHM6yMqwHaEK?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
@@ -255,6 +264,7 @@ export const PLACES: Place[] = [
       longitude: -68.648,
     },
     rating: 4.8,
+    ratingCount:0,
     imageUrl: 'https://www.plataforma10.com.ar/viajes/wp-content/uploads/2025/04/dique-ullum-san-juan.webp',
     images: [
       'https://www.plataforma10.com.ar/viajes/wp-content/uploads/2025/04/dique-ullum-san-juan.webp',
@@ -281,6 +291,7 @@ export const PLACES: Place[] = [
       longitude: -69.345,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://tse3.mm.bing.net/th/id/OIP.w_QNci0vO1zY6NQH3Mp9xwHaFj?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
     images: [
       'https://tse3.mm.bing.net/th/id/OIP.w_QNci0vO1zY6NQH3Mp9xwHaFj?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
@@ -307,6 +318,7 @@ export const PLACES: Place[] = [
       longitude: -69.2942,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://www.radiosolar.com.ar/wp-content/uploads/2017/11/Parque-Nacional-El-Leoncito-noche.jpg',
     images: [
       'https://www.radiosolar.com.ar/wp-content/uploads/2017/11/Parque-Nacional-El-Leoncito-noche.jpg',
@@ -334,6 +346,7 @@ export const PLACES: Place[] = [
       longitude: -68.5259,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://tse3.mm.bing.net/th/id/OIP.bnGJQ6VsGqMdApO7xW9h3QHaFD?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
     images: [
       'https://tse3.mm.bing.net/th/id/OIP.bnGJQ6VsGqMdApO7xW9h3QHaFD?r=0&rs=1&pid=ImgDetMain&o=7&rm=3',
@@ -363,6 +376,7 @@ export const PLACES: Place[] = [
       longitude: -67.9867,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://www.civitatis.com/f/argentina/san-juan-argentina/galeria/decoracion-difunta-correa.jpg',
     images: [
       'https://www.civitatis.com/f/argentina/san-juan-argentina/galeria/decoracion-difunta-correa.jpg',
@@ -387,6 +401,7 @@ export const PLACES: Place[] = [
       longitude: -68.5385,
     },
     rating: 5.0,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&w=800&q=80',
@@ -411,6 +426,7 @@ export const PLACES: Place[] = [
       longitude: -68.5252,
     },
     rating: 4.8,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1548625361-16a7576579b2?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1548625361-16a7576579b2?auto=format&fit=crop&w=800&q=80',
@@ -435,6 +451,7 @@ export const PLACES: Place[] = [
       longitude: -68.5412,
     },
     rating: 4.7,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=800&q=80',
@@ -459,6 +476,7 @@ export const PLACES: Place[] = [
       longitude: -68.5435,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=800&q=80',
@@ -483,6 +501,7 @@ export const PLACES: Place[] = [
       longitude: -68.5195,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?auto=format&fit=crop&w=800&q=80',
@@ -507,6 +526,7 @@ export const PLACES: Place[] = [
       longitude: -68.558,
     },
     rating: 4.9,
+    ratingCount:0,
     imageUrl: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?auto=format&fit=crop&w=800&q=80',
     images: [
       'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?auto=format&fit=crop&w=800&q=80',
