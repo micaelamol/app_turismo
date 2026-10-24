@@ -4,6 +4,7 @@ import { obtenerCategorias } from '../servicios/categories';
 import { obtenerEventos } from '../servicios/events';
 import { obtenerLugares } from '../servicios/places';
 import { Category, CityEvent, Coordinates, Lugar, Place, Review } from '../tipos';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface PlacesContextType {
   places: Place[];
@@ -18,6 +19,8 @@ interface PlacesContextType {
   isFavorite: (placeId: string) => boolean;
   visitedPlaces: string[];
   toggleVisited: (placeId: string) => boolean;
+  visitPhotos: Record<string, string>;
+  saveVisitPhoto: (placeId: string, uri: string) => Promise<void>;
   userRatings: Record<string, number>;
   ratePlace: (placeId: string, rating: number) => void;
   reviews: Review[];
@@ -124,6 +127,31 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setVisitedPlaces(newList);
     persistVisited(newList);
     return !isAlreadyVisited;
+  };
+    const [visitPhotos, setVisitPhotos] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@visitPhotos');
+        if (stored) setVisitPhotos(JSON.parse(stored));
+      } catch (e) {
+        console.warn('Error loading visit photos', e);
+      }
+    })();
+  }, []);
+
+  const saveVisitPhoto = async (placeId: string, uri: string) => {
+    try {
+      // La foto de la cámara queda en caché y puede borrarse: la copio a un lugar permanente
+      const dest = `${FileSystem.documentDirectory}visita-${placeId}-${Date.now()}.jpg`;
+      await FileSystem.copyAsync({ from: uri, to: dest });
+      const next = { ...visitPhotos, [placeId]: dest };
+      setVisitPhotos(next);
+      await AsyncStorage.setItem('@visitPhotos', JSON.stringify(next));
+    } catch (e) {
+      console.warn('Error saving visit photo', e);
+    }
   };
 
   const [userLocation, setUserLocation] = useState<Coordinates>({
@@ -302,6 +330,8 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isFavorite,
         visitedPlaces,
         toggleVisited,
+        visitPhotos,
+        saveVisitPhoto,
         userRatings,
         ratePlace,
         reviews,

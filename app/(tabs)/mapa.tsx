@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Image,
   Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import PlacesMap from '../../src/componentes/PlacesMap';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
 
@@ -31,105 +30,12 @@ export default function MapScreen() {
     }
   }, [filteredPlaces]);
 
-  // Escucha los clics en los pines del mapa (versión web)
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    const onMessage = (event: any) => {
-      const data = event?.data;
-      if (data && data.type === 'SELECT_PLACE') {
-        const found = filteredPlaces.find((p: Place) => p.id === data.placeId);
-        if (found) setSelectedPlace(found);
-      }
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [filteredPlaces]);
-
   const handleOpenGoogleMaps = (place: Place) => {
     const { latitude, longitude } = place.coordinates;
     const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     Linking.openURL(url).catch((err) => {
       console.error('Error abriendo mapa:', err);
     });
-  };
-
-  const generateMapHtml = () => {
-    const defaultLat = selectedPlace ? selectedPlace.coordinates.latitude : -31.5373;
-    const defaultLng = selectedPlace ? selectedPlace.coordinates.longitude : -68.5252;
-    const zoom =
-      selectedPlace &&
-      selectedPlace.category === 'naturaleza' &&
-      Math.abs(selectedPlace.coordinates.latitude - -31.5373) > 0.5
-        ? 9
-        : 12;
-
-    const markersJs = filteredPlaces
-      .map((p: Place) => {
-        const isSel = selectedPlace?.id === p.id;
-        const color = isSel ? '#4F46E5' : '#EF4444';
-        const titleSafe = p.title.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        const addrSafe = p.address.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        return `
-          (function() {
-            var icon = L.divIcon({
-              className: 'custom-pin',
-              html: '<div style="background-color: ${color}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">📍</div>',
-              iconSize: [32, 32],
-              iconAnchor: [16, 32]
-            });
-            var m = L.marker([${p.coordinates.latitude}, ${p.coordinates.longitude}], { icon: icon }).addTo(map);
-            m.bindPopup('<b>${titleSafe}</b><br/><span style="color:#666;font-size:12px;">${addrSafe}</span>');
-            m.on('click', function() {
-              var msg = { type: 'SELECT_PLACE', placeId: '${p.id}' };
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify(msg));
-              } else {
-                window.parent.postMessage(msg, '*');
-              }
-            });
-            ${isSel ? 'm.openPopup();' : ''}
-          })();
-        `;
-      })
-      .join('\n');
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-          html, body, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #E0E7FF; }
-          .custom-pin { cursor: pointer; transition: transform 0.2s; }
-          .custom-pin:hover { transform: scale(1.15); }
-          .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 6px 16px rgba(0,0,0,0.2); font-family: system-ui, -apple-system, sans-serif; }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-        <script>
-          var map = L.map('map', { zoomControl: true }).setView([${defaultLat}, ${defaultLng}], ${zoom});
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-          ${markersJs}
-        </script>
-      </body>
-      </html>
-    `;
-  };
-
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'SELECT_PLACE') {
-        const found = filteredPlaces.find((p: Place) => p.id === data.placeId);
-        if (found) setSelectedPlace(found);
-      }
-    } catch (e) {
-      console.warn('Mensaje inválido desde el mapa', e);
-    }
   };
 
   return (
@@ -166,23 +72,11 @@ export default function MapScreen() {
       </View>
 
       <View style={styles.mapCanvas}>
-        {Platform.OS === 'web' ? (
-          React.createElement('iframe', {
-            title: 'San Juan Real Map',
-            srcDoc: generateMapHtml(),
-            style: { width: '100%', height: '100%', border: 'none' },
-          })
-        ) : (
-          <WebView
-            originWhitelist={['*']}
-            source={{ html: generateMapHtml() }}
-            style={styles.webview}
-            onMessage={handleWebViewMessage}
-            javaScriptEnabled
-            domStorageEnabled
-            startInLoadingState
-          />
-        )}
+        <PlacesMap
+          places={filteredPlaces}
+          selectedPlace={selectedPlace}
+          onSelect={setSelectedPlace}
+        />
 
         <View style={styles.quickSelectBar}>
           <ScrollView
@@ -218,8 +112,9 @@ export default function MapScreen() {
                 <View style={styles.ratingBadge}>
                   <Ionicons name="star" size={12} color="#F59E0B" />
                   <Text style={styles.ratingText}>
-                    {/* {selectedPlace.ratingCount > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'} */}
-                    {(selectedPlace.ratingCount ?? 0) > 0 ? selectedPlace.rating.toFixed(1) : 'Nuevo'}
+                    {(selectedPlace.ratingCount ?? 0) > 0
+                      ? selectedPlace.rating.toFixed(1)
+                      : 'Nuevo'}
                   </Text>
                 </View>
               </View>
@@ -235,12 +130,6 @@ export default function MapScreen() {
                 <TouchableOpacity
                   style={styles.btnDetail}
                   onPress={() => router.push(`/place/${selectedPlace.id}`)}
-                  // onPress={() =>
-                  //   router.push({
-                  //     pathname: '/PlaceDetail',
-                  //     params: { placeId: selectedPlace.id },
-                  //   } as any)
-                  // }
                 >
                   <Text style={styles.btnDetailText}>Ver Detalle</Text>
                 </TouchableOpacity>
@@ -290,7 +179,6 @@ const styles = StyleSheet.create({
   filterChipText: { fontSize: 13, color: '#374151', fontWeight: '500' },
   filterChipTextActive: { color: '#fff' },
   mapCanvas: { flex: 1, position: 'relative' },
-  webview: { flex: 1, backgroundColor: '#E0E7FF' },
   quickSelectBar: { position: 'absolute', top: 12, left: 0, right: 0, zIndex: 10 },
   quickChip: {
     backgroundColor: 'rgba(255,255,255,0.9)',
