@@ -1,5 +1,5 @@
 // app/(tabs)/perfil.tsx
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -30,12 +30,6 @@ export default function ProfileScreen() {
     <TouchableOpacity
       style={styles.itemCard}
       activeOpacity={0.85}
-      // onPress={() =>
-      //   router.push({
-      //     pathname: '/PlaceDetail',
-      //     params: { placeId: item.id },
-      //   } as any)
-      // }
       onPress={() => router.push(`/place/${item.id}`)}
     >
       <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
@@ -175,7 +169,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Listado   */}
+      {/* Listado */}
       <FlatList
         data={currentList}
         renderItem={renderItem}
@@ -194,7 +188,7 @@ export default function ProfileScreen() {
                 : 'Aún no has marcado sitios visitados'}
             </Text>
             <Text style={styles.emptyStateSubtitle}>
-              Explora la ciudad y guarda los rincones que más te gusten.
+              Explora Colón y guarda los rincones que más te gusten.
             </Text>
           </View>
         }

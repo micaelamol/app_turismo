@@ -1,5 +1,5 @@
-
-import { Ionicons } from '@expo/vector-icons';
+// app/place/[id].tsx
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -36,7 +36,6 @@ export default function PlaceDetailScreen() {
     isFavorite,
     toggleFavorite,
     visitedPlaces,
-    /* markAsVisited, */
     toggleVisited,
     ratePlace,
     getReviewsByPlaceId,
@@ -70,30 +69,27 @@ export default function PlaceDetailScreen() {
   }
 
   const isVisited = visitedPlaces.includes(place.id);
-  const galleryImages: string[] =
-    place.images && place.images.length > 0 ? place.images : [place.imageUrl];
 
-  /* const handleMarkVisited = () => {
-    markAsVisited(place.id);
-    Alert.alert(
-      '¡Visita Registrada! 🎉',
-      `Has guardado tu visita a "${place.title}".\n\nPodés ver todo tu historial de visitas en la pestaña Perfil > Bitácora de Visitas.`
-    );
-  }; */
+  // Galería: el backend manda "imagenes"; se mantiene "images" por compatibilidad
+  const galleryImages: string[] =
+    place.imagenes && place.imagenes.length > 0
+      ? place.imagenes
+      : place.images && place.images.length > 0
+      ? place.images
+      : [place.imageUrl];
 
   const handleToggleVisited = () => {
-    const ahoraVisitado = toggleVisited(place.id)
-    if (ahoraVisitado){
-      Alert.alert('¡Visita Registrada! 🎉',
-        "has guardado tu visista a, "+`${place.title}`+". \n\nPodes ver todo tu historial de visitas en la pestaña perfil > bitacora visitas"  
+    const ahoraVisitado = toggleVisited(place.id);
+    if (ahoraVisitado) {
+      Alert.alert(
+        '¡Visita Registrada! 🎉',
+        `Has guardado tu visita a "${place.title}".\n\nPodés ver tu historial en la pestaña Recorrido.`
       );
-    
-    }else{
-      Alert.alert('Visita Eliminada',
-        'Quitamos, '+`${place.title}`+' ,de tu bitacora'
-      )
+    } else {
+      Alert.alert('Visita Eliminada', `Quitamos "${place.title}" de tu historial.`);
     }
-  }
+  };
+
   const handleRate = (stars: number) => {
     ratePlace(place.id, stars);
     setJustRated(stars);
@@ -279,7 +275,6 @@ export default function PlaceDetailScreen() {
           <View style={styles.actionButtonsRow}>
             <TouchableOpacity
               style={[styles.btnAccion, isVisited && styles.btnAccionActive]}
-              /* onPress={handleMarkVisited} */
               onPress={handleToggleVisited}
             >
               <Ionicons
@@ -288,8 +283,7 @@ export default function PlaceDetailScreen() {
                 color={isVisited ? '#fff' : '#4F46E5'}
               />
               <Text style={[styles.btnAccionText, isVisited && styles.btnAccionTextActive]}>
-                
-                    {isVisited ? 'Quitar de visitados' : 'Marcar Visitado'} 
+                {isVisited ? 'Quitar de visitados' : 'Marcar Visitado'}
               </Text>
             </TouchableOpacity>
 

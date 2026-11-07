@@ -10,11 +10,12 @@ type Props = {
   onSelect: (place: Place) => void;
 };
 
-const SAN_JUAN: Region = {
-  latitude: -31.5373,
-  longitude: -68.5252,
-  latitudeDelta: 0.5,
-  longitudeDelta: 0.5,
+// Región inicial: Colón, Entre Ríos
+const COLON: Region = {
+  latitude: -32.2241,
+  longitude: -58.1411,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
 };
 
 export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
@@ -53,8 +54,8 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
       {
         latitude: selectedPlace.coordinates.latitude,
         longitude: selectedPlace.coordinates.longitude,
-        latitudeDelta: 0.15,
-        longitudeDelta: 0.15,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
       },
       600
     );
@@ -66,7 +67,7 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
     <MapView
       ref={mapRef}
       style={StyleSheet.absoluteFill}
-      initialRegion={SAN_JUAN}
+      initialRegion={COLON}
       onMapReady={handleReady}
       showsUserLocation={hasPermission}
       showsMyLocationButton={hasPermission}

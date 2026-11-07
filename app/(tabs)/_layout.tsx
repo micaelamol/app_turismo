@@ -1,16 +1,16 @@
 // app/(tabs)/_layout.tsx
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 
 export default function TabsLayout() {
   return (
     <Tabs screenOptions={{
-      tabBarActiveTintColor: '#A8422A', 
+      tabBarActiveTintColor: '#A8422A',
       tabBarInactiveTintColor: '#666',
       headerShown: true,
       tabBarStyle: { backgroundColor: '#fff' }
     }}>
-      {/* 1. Inicio (Tu Home Screen con categorías y banner) */}
+      {/* 1. Inicio (banner, categorías y lugares) */}
       <Tabs.Screen
         name="index"
         options={{
@@ -20,7 +20,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 2. Nueva pestaña dedicada al Mapa interactivo de San Juan */}
+      {/* 2. Mapa interactivo de Colón */}
       <Tabs.Screen
         name="mapa"
         options={{
@@ -30,7 +30,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 3. Agenda de Eventos */}
+      {/* 3. Agenda de eventos */}
       <Tabs.Screen
         name="agenda"
         options={{
@@ -40,7 +40,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 4. Tu Historial de Recorrido */}
+      {/* 4. Historial de recorrido */}
       <Tabs.Screen
         name="recorrido"
         options={{
@@ -50,7 +50,7 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* 5. Perfil de Usuario (Yo) con favoritos y bitácora integrados */}
+      {/* 5. Perfil con favoritos y bitácora */}
       <Tabs.Screen
         name="perfil"
         options={{

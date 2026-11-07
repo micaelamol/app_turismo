@@ -1,7 +1,6 @@
 // src/servicios/events.ts
 import { Evento, RespuestaApi, RespuestaApiExito } from '../tipos';
-
-const BASE_URL = 'http://192.168.0.102:3000';
+import { BASE_URL } from './config';
 
 /**
  * Obtiene el listado de eventos desde la API de PostgreSQL
@@ -30,20 +29,3 @@ export async function obtenerEventoPorId(id: string): Promise<RespuestaApi<Event
 }
 
 
-// import { MOCK_EVENTOS } from '../mocks/events';
-// import { Evento, RespuestaApiExito } from '../tipos';
-
-// const simularDelay = (ms: number = 100) =>
-//   new Promise((resolve) => setTimeout(resolve, ms));
-
-// export async function obtenerEventos(): Promise<RespuestaApiExito<Evento[]>> {
-//   await simularDelay();
-//   return {
-//     datos: MOCK_EVENTOS,
-//     meta: {
-//       total: MOCK_EVENTOS.length,
-//       pagina: 1,
-//       porPagina: 20,
-//     },
-//   };
-// }

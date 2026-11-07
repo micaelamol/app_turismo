@@ -1,7 +1,8 @@
 // app/(tabs)/index.tsx
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@react-native-vector-icons/ionicons'; 
 import { useRouter } from 'expo-router';
 import React from 'react';
+
 import {
   FlatList,
   Image,
@@ -33,18 +34,16 @@ export default function HomeScreen() {
     toggleFavorite,
   } = usePlaces();
 
-  const featuredPlaces = places.filter((p: Place) => p.isFeatured);
+  // Destacados: si el backend no marca ninguno, se muestran los primeros 5
+  const marcados = places.filter((p: Place) => p.isFeatured);
+  const featuredPlaces = marcados.length > 0 ? marcados : places.slice(0, 5);
 
-  // const goToDetail = (id: string) => {
-  //   router.push({
-  //     pathname: '/PlaceDetail',
-  //     params: { placeId: id },
-  //   } as any);
-  // };
+  // Imagen del banner: la del primer lugar que venga de la API
+  const heroUri = places[0]?.imageUrl || undefined;
 
-     const goToDetail = (id: string) => {
-       router.push(`/place/${id}`);
-     };
+  const goToDetail = (id: string) => {
+    router.push(`/place/${id}`);
+  };
 
   const renderCategoryItem = ({ item }: { item: any }) => {
     const isSelected = selectedCategory === item.id;
@@ -57,13 +56,13 @@ export default function HomeScreen() {
         onPress={() => setSelectedCategory(item.id)}
       >
         <Ionicons
-          name={item.icon as any}
+          name={(item.icono ?? item.icon) as any}
           size={16}
           color={isSelected ? '#fff' : item.color}
           style={{ marginRight: 6 }}
         />
         <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextActive]}>
-          {item.name}
+          {item.nombre ?? item.name}
         </Text>
       </TouchableOpacity>
     );
@@ -162,21 +161,19 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* HERO BANNER */}
         <ImageBackground
-          source={{
-            uri: 'https://www.plataforma10.com.ar/viajes/wp-content/uploads/2025/01/san-juan-arreglada-2048x667.jpg',
-          }}
+          source={heroUri ? { uri: heroUri } : undefined}
           style={styles.heroBanner}
           imageStyle={styles.heroBannerImage}
         >
           <View style={styles.heroOverlay}>
             <View style={styles.heroTopRow}>
-              <View style={styles.sanjuanTag}>
+              <View style={styles.locationTag}>
                 <Ionicons name="sunny" size={14} color="#F59E0B" />
-                <Text style={styles.sanjuanTagText}>SAN JUAN, ARGENTINA</Text>
+                <Text style={styles.locationTagText}>COLÓN, ENTRE RÍOS</Text>
               </View>
               <View style={styles.roleChip}>
                 <Text style={styles.roleChipText}>
-                  {user?.role === 'turista' ? '✈️ Turista' : '🏡 Sanjuanino'}
+                  {user?.role === 'turista' ? '✈️ Turista' : '🏡 Colonense'}
                 </Text>
               </View>
             </View>
@@ -185,9 +182,9 @@ export default function HomeScreen() {
               <Text style={styles.heroGreeting}>
                 ¡Hola, {user?.name?.split(' ')[0] || 'Explorador'}!
               </Text>
-              <Text style={styles.heroTitle}>Tierra del Sol y del Buen Vino</Text>
+              <Text style={styles.heroTitle}>Perla del Río Uruguay</Text>
               <Text style={styles.heroSubtitle}>
-                Descubre monumentos, bodegas, diques y cultura viva
+                Descubre termas, playas, la costanera y naturaleza
               </Text>
             </View>
           </View>
@@ -200,7 +197,7 @@ export default function HomeScreen() {
             <Ionicons name="search-outline" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar teatros, museos, diques, bodegas..."
+              placeholder="Buscar termas, playas, museos, parques..."
               placeholderTextColor="#9CA3AF"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -229,7 +226,7 @@ export default function HomeScreen() {
           {!searchQuery && selectedCategory === 'all' && (
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Imperdibles de San Juan</Text>
+                <Text style={styles.sectionTitle}>Imperdibles de Colón</Text>
                 <Text style={styles.seeAllText}>Top Valorados</Text>
               </View>
               <FlatList
@@ -267,7 +264,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 24 },
 
   // Hero
-  heroBanner: { width: '100%', height: 220 },
+  heroBanner: { width: '100%', height: 220, backgroundColor: '#1F2937' },
   heroBannerImage: { resizeMode: 'cover' },
   heroOverlay: {
     flex: 1,
@@ -281,7 +278,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  sanjuanTag: {
+  locationTag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.9)',
@@ -289,7 +286,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  sanjuanTagText: { fontSize: 10, fontWeight: 'bold', color: '#111827', marginLeft: 4 },
+  locationTagText: { fontSize: 10, fontWeight: 'bold', color: '#111827', marginLeft: 4 },
   roleChip: {
     backgroundColor: '#4F46E5',
     paddingHorizontal: 10,

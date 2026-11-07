@@ -1,5 +1,5 @@
 // app/(auth)/login.tsx
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -69,8 +69,8 @@ export default function LoginScreen() {
         <View style={styles.iconCircle}>
           <Ionicons name="sunny" size={42} color="#F59E0B" />
         </View>
-        <Text style={styles.appName}>San Juan</Text>
-        <Text style={styles.tagline}>Guía Turística & Cultural ☀️🍷</Text>
+        <Text style={styles.appName}>Colón</Text>
+        <Text style={styles.tagline}>Guía Turística & Cultural 🌅🏖️</Text>
       </View>
 
       <View style={styles.card}>
@@ -100,7 +100,7 @@ export default function LoginScreen() {
               color={selectedRole === 'habitante' ? '#fff' : '#6B7280'}
             />
             <Text style={[styles.roleButtonText, selectedRole === 'habitante' && styles.roleButtonTextActive]}>
-              Sanjuanino
+              Colonense
             </Text>
           </TouchableOpacity>
         </View>

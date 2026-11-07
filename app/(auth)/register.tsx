@@ -1,5 +1,5 @@
 // app/(auth)/register.tsx
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -12,11 +12,11 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useRouter } from 'expo-router'; // Migrado a Expo Router
-import { useAuth } from '../../src/context/AuthContext'; // Ruta corregida hacia src
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../src/context/AuthContext';
 
 export default function RegisterScreen() {
-  const router = useRouter(); // Instanciamos el router nativo
+  const router = useRouter();
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -31,7 +31,7 @@ export default function RegisterScreen() {
     if (register) {
       register(name, email, role);
     }
-    // Una vez registrado con éxito, lo mandamos directo al inicio de la app
+    // Una vez registrado, lo mandamos directo al inicio de la app
     router.replace('/(tabs)');
   };
 
@@ -41,14 +41,13 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Reemplazamos navigation.goBack() por router.back() */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
 
         <View style={styles.header}>
           <Text style={styles.title}>Crea tu Cuenta</Text>
-          <Text style={styles.subtitle}>Comienza a explorar los mejores rincones de la ciudad</Text>
+          <Text style={styles.subtitle}>Comienza a explorar los mejores rincones de Colón</Text>
         </View>
 
         <View style={styles.card}>

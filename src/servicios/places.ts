@@ -1,13 +1,12 @@
 // src/servicios/places.ts
+// src/servicios/places.ts
 import {
   Lugar,
   RespuestaApi,
   RespuestaApiError,
   RespuestaApiExito,
 } from '../tipos';
-
-// Dirección IP local de tu computadora apuntando al backend de NestJS
-const BASE_URL = 'http://192.168.0.102:3000';
+import { BASE_URL } from './config';
 
 export interface FiltrosLugares {
   categoriaId?: string;

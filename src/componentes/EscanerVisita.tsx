@@ -1,4 +1,5 @@
-import { Ionicons } from '@expo/vector-icons';
+// src/componentes/EscanerVisita.tsx
+import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
 import {
@@ -36,6 +37,9 @@ export default function EscanerVisita({
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [choosingPlace, setChoosingPlace] = useState(false);
+
+  // Solo para pruebas en desarrollo: código QR del primer lugar que tenga uno
+  const qrDePrueba = places.find((p) => p.codigoQr)?.codigoQr ?? null;
 
   const reset = () => {
     setPlace(null);
@@ -191,13 +195,13 @@ export default function EscanerVisita({
                   : 'Saca una foto y después elige el lugar'}
               </Text>
               <View style={styles.row}>
-                {/* BOTÓN DE PRUEBA: borrar cuando termines de probar en el emulador */}
-                {modo === 'qr' && (
+                {/* Botón de prueba: solo en desarrollo y si algún lugar tiene código QR */}
+                {__DEV__ && modo === 'qr' && qrDePrueba && (
                   <TouchableOpacity
                     style={styles.secondaryBtn}
-                    onPress={() => handleScan({ data: 'p5' })}
+                    onPress={() => handleScan({ data: qrDePrueba })}
                   >
-                    <Text style={styles.secondaryText}>Simular QR (p5)</Text>
+                    <Text style={styles.secondaryText}>Simular QR</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.primaryBtn} onPress={takePhoto}>
