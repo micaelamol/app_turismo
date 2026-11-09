@@ -2,11 +2,61 @@
 import { Categoria } from '../tipos';
 
 export const MOCK_CATEGORIAS: Categoria[] = [
-  { id: 'all', nombre: 'Todos', name: 'Todos', icono: 'apps-outline', icon: 'apps-outline', color: '#4F46E5', orden: 0 },
-  { id: 'monumentos', nombre: 'Historia & Santuarios', name: 'Historia & Santuarios', icono: 'business-outline', icon: 'business-outline', color: '#6366F1', orden: 1 },
-  { id: 'naturaleza', nombre: 'Diques & Paisajes', name: 'Diques & Paisajes', icono: 'trail-sign-outline', icon: 'trail-sign-outline', color: '#06B6D4', orden: 2 },
-  { id: 'museos', nombre: 'Museos & Arte', name: 'Museos & Arte', icono: 'library-outline', icon: 'library-outline', color: '#EC4899', orden: 3 },
-  { id: 'parques', nombre: 'Parques & Plazas', name: 'Parques & Plazas', icono: 'leaf-outline', icon: 'leaf-outline', color: '#10B981', orden: 4 },
-  { id: 'cultura', nombre: 'Teatros & Auditorios', name: 'Teatros & Auditorios', icono: 'musical-notes-outline', icon: 'musical-notes-outline', color: '#8B5CF6', orden: 5 },
-  { id: 'gastronomia', nombre: 'Ruta del Vino & Sabores', name: 'Ruta del Vino & Sabores', icono: 'wine-outline', icon: 'wine-outline', color: '#F59E0B', orden: 6 },
+  
+  {
+    id: "cat-alojamiento",
+    nombre: "Alojamiento",
+    icono: "bed-outline",
+    color: "#34495E",
+    orden: 7
+  },
+  {
+    id: "cat-artesanias",
+    nombre: "Artesanías",
+    icono: "color-palette-outline",
+    color: "#8E44AD",
+    orden: 5
+  },
+  {
+    id: "cat-bodegas",
+    nombre: "Bodegas",
+    icono: "wine-outline",
+    color: "#7B241C",
+    orden: 8
+  },
+  {
+    id: "cat-gastronomia",
+    nombre: "Gastronomía",
+    icono: "restaurant-outline",
+    color: "#D35400",
+    orden: 4
+  },
+  {
+    id: "cat-museos",
+    nombre: "Museos y patrimonio",
+    icono: "business-outline",
+    color: "#8E5A4A",
+    orden: 3
+  },
+  {
+    id: "cat-naturaleza",
+    nombre: "Naturaleza",
+    icono: "leaf-outline",
+    color: "#27AE60",
+    orden: 6
+  },
+  {
+    id: "cat-playas",
+    nombre: "Playas",
+    icono: "sunny-outline",
+    color: "#2E86C1",
+    orden: 1
+  },
+  {
+    id: "cat-termas",
+    nombre: "Termas",
+    icono: "water-outline",
+    color: "#16A085",
+    orden: 2
+  }
 ];

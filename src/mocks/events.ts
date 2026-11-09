@@ -2,84 +2,110 @@
 import { Evento } from '../tipos';
 
 export const MOCK_EVENTOS: Evento[] = [
+  
   {
-    id: 'e1',
-    titulo: 'Fiesta Nacional del Sol (FNS)',
-    descripcion: 'La máxima celebración sanjuanina con desfile de carruajes, artistas internacionales, feria agroindustrial y el gran espectáculo final temático.',
-    lugarId: 'p17',
-    direccionLibre: 'Predio Costanera Complejo Ferial / Estadio San Juan del Bicentenario',
-    coordenadas: { latitud: -31.6033, longitud: -68.5306 },
-    inicio: '2026-02-20T20:00:00-03:00',
-    fin: '2026-02-25T04:00:00-03:00',
-    imagenUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
+    id: "evt-017",
+    titulo: "Peña en el anfiteatro",
+    descripcion: "Noche de folclore con artistas de la región.",
+    lugarId: "lug-009", // Asociado al Anfiteatro Municipal
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-11-14T21:00:00-03:00",
+    fin: "2026-11-15T02:00:00-03:00",
+    imagenUrl: "https://colon.tur.ar",
+    precio: 0, // Gratis
+    estado: "programado"
+  },
+  {
+    id: "evt-018",
+    titulo: "Noche de luces en la costanera",
+    descripcion: "Música en vivo y fuegos artificiales sobre el río. Empieza a la noche y sigue hasta la madrugada: cruza la medianoche.",
+    lugarId: "lug-014", // Costanera Gobernador Quirós
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-12-31T22:00:00-03:00",
+    fin: "2027-01-01T04:00:00-03:00",
+    imagenUrl: null,
+    precio: 0,
+    estado: "cancelado" // Caso de prueba solicitado por la dirección
+  },
+  {
+    id: "evt-019",
+    titulo: "Feria de artesanos en la plaza",
+    descripcion: "Artesanías, dulces caseros y comidas regionales en la Plaza San Martín. La entrada es libre.",
+    lugarId: "lug-027", // Feria de la Plaza San Martín
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-11-14T10:00:00-03:00",
+    fin: "2026-11-15T22:00:00-03:00",
+    imagenUrl: null,
+    precio: 0,
+    estado: "programado"
+  },
+  {
+    id: "evt-020",
+    titulo: "Peña folklórica en el Club de Pescadores",
+    descripcion: "Empanadas, guitarreada y baile. Consultá el precio en el club.",
+    lugarId: null, // Caso especial: sin lugarId en catálogo
+    direccionLibre: "Club de Pescadores, Costanera Sur, Colón",
+    coordenadas: { latitud: -32.2350, longitud: -58.1340 },
+    inicio: "2026-11-20T21:30:00-03:00",
+    fin: null,
+    imagenUrl: null,
+    precio: null, // Precio dinámico / no aplica directo
+    estado: "programado"
+  }
+    {
+    id: "evt-021",
+    titulo: "Regata del río Uruguay",
+    descripcion: "Regata de veleros frente a la costanera. Suspendida por el pronóstico de viento.",
+    lugarId: "lug-007", // Puerto Viejo
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-11-14T14:00:00-03:00",
+    fin: "2026-11-14T18:00:00-03:00",
+    imagenUrl: null,
+    precio: 0,
+    estado: "suspendido" // Caso solicitado: marcado como suspendido por clima
+  },
+  {
+    id: "evt-022",
+    titulo: "Cine bajo las estrellas",
+    descripcion: "Función al aire libre en el parque. Cancelada.",
+    lugarId: "lug-015", // Parque Dr. Herminio J. Quirós
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-11-15T20:30:00-03:00",
+    fin: "2026-11-15T22:30:00-03:00",
+    imagenUrl: null,
+    precio: 0,
+    estado: "cancelado"
+  },
+  {
+    id: "evt-023",
+    titulo: "Fiesta de la Playa",
+    descripcion: "Música, deportes de playa y un día entero en la Playa Norte.",
+    lugarId: "lug-002", // Playa Norte
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-01-15T09:00:00-03:00",
+    fin: "2026-01-18T23:59:00-03:00",
+    imagenUrl: "https://colon.tur.ar",
+    precio: 0,
+    estado: "finalizado"
+  },
+  {
+    id: "evt-024",
+    titulo: "Muestra de fotografía de Colón",
+    descripcion: "Fotos históricas de la ciudad en el Museo Casa de la Cultura.",
+    lugarId: "lug-005", // Museo Casa de la Cultura
+    direccionLibre: null,
+    coordenadas: null,
+    inicio: "2026-11-10T18:00:00-03:00",
+    fin: "2026-11-25T21:00:00-03:00",
+    imagenUrl: null,
     precio: null,
-    estado: 'programado',
-    // Compatibilidad
-    title: 'Fiesta Nacional del Sol (FNS)',
-    date: 'Febrero de cada año',
-    time: '20:00 a 04:00 hrs',
-    location: 'Predio Costanera Complejo Ferial / Estadio San Juan del Bicentenario',
-    category: 'cultura',
-    imageUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'e2',
-    titulo: 'Gala Lírica en el Teatro del Bicentenario',
-    descripcion: 'Presentación de la Orquesta Sinfónica de la UNSJ junto al Coro Universitario interpretando clásicos de Puccini y Verdi.',
-    lugarId: 'p2',
-    direccionLibre: 'Sala Principal - Teatro del Bicentenario',
-    coordenadas: { latitud: -31.5378, longitud: -68.5385 },
-    inicio: '2026-11-14T21:30:00-03:00',
-    fin: '2026-11-14T23:30:00-03:00',
-    imagenUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?auto=format&fit=crop&w=800&q=80',
-    precio: 2500,
-    estado: 'programado',
-    // Compatibilidad
-    title: 'Gala Lírica en el Teatro del Bicentenario',
-    date: 'Viernes 14 de Noviembre',
-    time: '21:30 hrs',
-    location: 'Sala Principal - Teatro del Bicentenario',
-    category: 'cultura',
-    imageUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'e3',
-    titulo: 'Feria de Sabores Sanjuaninos y Artesanías',
-    descripcion: 'Puestos de dulces de membrillo rubio, aceites de oliva premiados internacionalmente, vinos de autor y artesanías en cuero y madera.',
-    lugarId: 'p4',
-    direccionLibre: 'Paseo de los Artesanos, Parque de Mayo',
-    coordenadas: { latitud: -31.5321, longitud: -68.5412 },
-    inicio: '2026-10-18T16:00:00-03:00',
-    fin: '2026-10-18T22:00:00-03:00',
-    imagenUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=800&q=80',
-    precio: 0,
-    estado: 'programado',
-    // Compatibilidad
-    title: 'Feria de Sabores Sanjuaninos y Artesanías',
-    date: 'Todos los Sábados y Domingos',
-    time: '16:00 a 22:00 hrs',
-    location: 'Paseo de los Artesanos, Parque de Mayo',
-    category: 'gastronomia',
-    imageUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=800&q=80',
-  },
-  {
-    id: 'e4',
-    titulo: 'Concierto de Órgano Tubular en el Auditorio Juan Victoria',
-    descripcion: 'Recital acústico solista con el imponente órgano alemán Walcker de 3.565 tubos con obras maestras de J.S. Bach.',
-    lugarId: 'p5',
-    direccionLibre: 'Sala Félix Perramón - Auditorio Juan Victoria',
-    coordenadas: { latitud: -31.5298, longitud: -68.5435 },
-    inicio: '2026-11-23T20:30:00-03:00',
-    fin: '2026-11-23T22:30:00-03:00',
-    imagenUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-    precio: 0,
-    estado: 'programado',
-    // Compatibilidad
-    title: 'Concierto de Órgano Tubular en el Auditorio Juan Victoria',
-    date: 'Domingo 23 de Noviembre',
-    time: '20:30 hrs',
-    location: 'Sala Félix Perramón - Auditorio Juan Victoria',
-    category: 'cultura',
-    imageUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
-  },
+    estado: "programado"
+  }
+
 ];
