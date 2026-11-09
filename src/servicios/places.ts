@@ -6,7 +6,7 @@ import {
   RespuestaApiError,
   RespuestaApiExito,
 } from '../tipos';
-import { BASE_URL } from './config';
+
 
 export interface FiltrosLugares {
   categoriaId?: string;
@@ -28,7 +28,7 @@ export async function obtenerLugares(
     params.append('busqueda', filtros.busqueda);
   }
 
-  const url = `${BASE_URL}/lugares?${params.toString()}`;
+  const url = `${process.env.EXPO_PUBLIC_API_URL}/lugares?${params.toString()}`;
   const respuesta = await fetch(url);
   
   if (!respuesta.ok) {
@@ -44,7 +44,7 @@ export async function obtenerLugares(
 export async function obtenerLugarPorId(
   id: string
 ): Promise<RespuestaApi<Lugar>> {
-  const respuesta = await fetch(`${BASE_URL}/lugares/${id}`);
+  const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/${id}`);
   
   if (!respuesta.ok) {
     const error: RespuestaApiError = {
@@ -65,7 +65,7 @@ export async function obtenerLugarPorId(
 export async function obtenerLugarPorQr(
   codigoQr: string
 ): Promise<RespuestaApi<Lugar>> {
-  const respuesta = await fetch(`${BASE_URL}/lugares/qr/${encodeURIComponent(codigoQr)}`);
+  const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/qr/${encodeURIComponent(codigoQr)}`);
   
   if (!respuesta.ok) {
     const error: RespuestaApiError = {

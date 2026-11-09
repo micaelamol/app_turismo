@@ -2,7 +2,7 @@
 import * as Network from 'expo-network';
 import { Categoria, RespuestaApiExito } from '../tipos';
 import { guardarCategoriasEnSQLite, obtenerCategoriasDeSQLite } from './database';
-import { BASE_URL } from './config';
+
 
 
 /**
@@ -17,7 +17,8 @@ export async function obtenerCategorias(): Promise<RespuestaApiExito<Categoria[]
 
     if (estadoRed.isConnected && estadoRed.isInternetReachable) {
       // 2. Flujo Online: Petición HTTP al servidor PostgreSQL
-      const respuesta = await fetch(`${BASE_URL}/categorias`);
+     
+      const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/categorias`);
       
       if (!respuesta.ok) {
         throw new Error(`Error en el servidor backend: ${respuesta.status}`);
