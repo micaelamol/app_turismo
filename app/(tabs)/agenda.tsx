@@ -1,10 +1,11 @@
 // app/(tabs)/agenda.tsx
 import { Ionicons } from '@react-native-vector-icons/ionicons'; // Requisito estricto de la cátedra
-import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
-  FlatList,
   Image,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,31 +13,104 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlaces } from '../../src/context/PlacesContext';
+import { useAgendaEventos } from '../../src/hooks/useAgendaEventos';
+import { eventoGuardadoAEvento } from '../../src/servicios/agendaDb';
 import { CityEvent } from '../../src/tipos';
+import {
+  claveDiaEvento,
+  eventoYaPaso,
+  ordenarEventosPorInicio,
+  tituloDiaEvento,
+} from '../../src/utils/eventos';
+
+function ImagenEvento({ uri }: { uri: string | null }) {
+  const [fallo, setFallo] = useState(false);
+
+  if (!uri || fallo) {
+    return (
+      <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+        <Ionicons name="calendar-outline" size={36} color="#9CA3AF" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.eventImage}
+      onError={() => setFallo(true)}
+    />
+  );
+}
 
 export default function EventsScreen() {
-  const { events, eventReminders, toggleEventReminder } = usePlaces();
+  const router = useRouter();
+  const { events, cargando, error } = usePlaces();
+  const { eventosGuardados, estaGuardado, guardarEvento, quitarEvento } = useAgendaEventos();
   const [selectedFilter] = useState('all');
+  const [vista, setVista] = useState<'todos' | 'guardados'>('todos');
+
+  const eventosGuardadosComoEventos = eventosGuardados.map(eventoGuardadoAEvento);
+
+  // Si la API no devolvió eventos (sin red o error) y hay guardados,
+  // mostramos la copia local para que la agenda siga siendo usable.
+  const mostrandoGuardadosPorFaltaDeRed =
+    vista === 'todos' &&
+    eventosGuardados.length > 0 &&
+    (Boolean(error) || (!cargando && events.length === 0));
+
+  const eventosBase =
+    vista === 'guardados' || mostrandoGuardadosPorFaltaDeRed
+      ? eventosGuardadosComoEventos
+      : events;
 
   const filteredEvents =
     selectedFilter === 'all'
-      ? events
-      : events.filter((e: CityEvent) => e.category === selectedFilter);
+      ? eventosBase
+      : eventosBase.filter((e: CityEvent) => e.category === selectedFilter);
 
-  const handleToggleReminder = (event: CityEvent) => {
-    const isNowReminded = toggleEventReminder(event.id);
-    if (isNowReminded) {
-      Alert.alert(
-        '🔔 ¡Recordatorio Activado!',
-        `Te avisaremos con anticipación antes de: ${event.title || event.titulo}.`
-      );
-    } else {
-      Alert.alert('Recordatorio desactivado', `Ya no recibirás alertas de ${event.title || event.titulo}.`);
+  // PRD §3: "Ver los eventos por día, empezando por hoy."
+  const secciones = useMemo(() => {
+    const porDia = new Map<string, CityEvent[]>();
+
+    for (const evento of ordenarEventosPorInicio(filteredEvents)) {
+      const clave = claveDiaEvento(evento.inicio);
+      const lista = porDia.get(clave);
+      if (lista) {
+        lista.push(evento);
+      } else {
+        porDia.set(clave, [evento]);
+      }
     }
+
+    return Array.from(porDia.entries()).map(([clave, data]) => ({
+      title: tituloDiaEvento(clave),
+      data,
+    }));
+  }, [filteredEvents]);
+
+  const handleToggleReminder = async (event: CityEvent) => {
+    if (estaGuardado(event.id)) {
+      const resultado = await quitarEvento(event.id);
+      Alert.alert('Mi agenda', resultado.mensaje);
+      return;
+    }
+
+    const resultado = await guardarEvento(event);
+    Alert.alert(
+      !resultado.guardado
+        ? 'No se pudo guardar'
+        : resultado.recordatorioProgramado
+        ? '🔔 ¡Recordatorio Activado!'
+        : 'Evento guardado',
+      resultado.mensaje
+    );
   };
 
   const renderEventCard = ({ item }: { item: CityEvent }) => {
-    const isReminded = eventReminders.includes(item.id);
+    const isReminded = estaGuardado(item.id);
+    // Los eventos vencidos se siguen mostrando, pero marcados y sin recordatorio.
+    const yaPaso = eventoYaPaso(item);
 
     // Mapeo adaptativo por si los campos vienen desde la API en español o inglés
     const titulo = item.title || item.titulo || '';
@@ -68,59 +142,93 @@ export default function EventsScreen() {
 
     return (
       <View style={styles.eventCard}>
-        {imagen ? (
-          <Image source={{ uri: imagen }} style={styles.eventImage} />
-        ) : (
-          <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
-            <Ionicons name="calendar-outline" size={36} color="#9CA3AF" />
-          </View>
-        )}
-        {precio && (
-          <View style={styles.priceTag}>
-            <Text style={styles.priceText}>{precio}</Text>
-          </View>
-        )}
-
-        <View style={styles.cardContent}>
-          <Text style={styles.eventTitle}>{titulo}</Text>
-
-          {fechaTexto && (
-            <View style={styles.metaRow}>
-              <Ionicons name="calendar-outline" size={14} color="#4F46E5" />
-              <Text style={styles.metaText}>{fechaTexto}</Text>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => router.push(`/evento/${item.id}`)}
+          accessibilityLabel={`Ver detalle de ${titulo}`}
+        >
+          <ImagenEvento uri={imagen} />
+          {precio && (
+            <View style={styles.priceTag}>
+              <Text style={styles.priceText}>{precio}</Text>
             </View>
           )}
 
-          {horaTexto && (
-            <View style={styles.metaRow}>
-              <Ionicons name="time-outline" size={14} color="#4F46E5" />
-              <Text style={styles.metaText}>{horaTexto} hs</Text>
+          {yaPaso && (
+            <View style={styles.pastTag}>
+              <Ionicons name="time-outline" size={12} color="#fff" />
+              <Text style={styles.pastTagText}>Ya pasó</Text>
             </View>
           )}
 
-          <View style={styles.metaRow}>
-            <Ionicons name="location-outline" size={14} color="#4F46E5" />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {direccion}
-            </Text>
+          <View style={styles.cardContent}>
+            <View style={styles.titleRow}>
+              <Text style={styles.eventTitle}>{titulo}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            </View>
+
+            {fechaTexto && (
+              <View style={styles.metaRow}>
+                <Ionicons name="calendar-outline" size={14} color="#4F46E5" />
+                <Text style={styles.metaText}>{fechaTexto}</Text>
+              </View>
+            )}
+
+            {horaTexto && (
+              <View style={styles.metaRow}>
+                <Ionicons name="time-outline" size={14} color="#4F46E5" />
+                <Text style={styles.metaText}>{horaTexto} hs</Text>
+              </View>
+            )}
+
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={14} color="#4F46E5" />
+              <Text style={styles.metaText} numberOfLines={1}>
+                {direccion}
+              </Text>
+            </View>
+
+            <Text style={styles.eventDescription}>{descripcion}</Text>
           </View>
+        </TouchableOpacity>
 
-          <Text style={styles.eventDescription}>{descripcion}</Text>
-
-          <TouchableOpacity
-            style={[styles.remindButton, isReminded && styles.remindButtonActive]}
-            onPress={() => handleToggleReminder(item)}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name={isReminded ? 'notifications' : 'notifications-outline'}
-              size={16}
-              color={isReminded ? '#fff' : '#4F46E5'}
-            />
-            <Text style={[styles.remindText, isReminded && styles.remindTextActive]}>
-              {isReminded ? '✓ Recordatorio Activado' : 'Recordarme este evento'}
-            </Text>
-          </TouchableOpacity>
+        <View style={styles.cardActions}>
+          {yaPaso ? (
+            isReminded ? (
+              <TouchableOpacity
+                style={[styles.remindButton, styles.remindButtonPast]}
+                onPress={() => handleToggleReminder(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash-outline" size={16} color="#6B7280" />
+                <Text style={[styles.remindText, styles.remindTextPast]}>
+                  Quitar de mi agenda
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.remindButton, styles.remindButtonPast]}>
+                <Ionicons name="time-outline" size={16} color="#6B7280" />
+                <Text style={[styles.remindText, styles.remindTextPast]}>
+                  Evento vencido · no se puede recordar
+                </Text>
+              </View>
+            )
+          ) : (
+            <TouchableOpacity
+              style={[styles.remindButton, isReminded && styles.remindButtonActive]}
+              onPress={() => handleToggleReminder(item)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isReminded ? 'notifications' : 'notifications-outline'}
+                size={16}
+                color={isReminded ? '#fff' : '#4F46E5'}
+              />
+              <Text style={[styles.remindText, isReminded && styles.remindTextActive]}>
+                {isReminded ? '✓ Recordatorio Activado' : 'Recordarme este evento'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -131,16 +239,65 @@ export default function EventsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Eventos & Actividades</Text>
         <Text style={styles.subtitle}>Descubre qué está pasando en Colón</Text>
+
+        <View style={styles.filterRow}>
+          <TouchableOpacity
+            style={[styles.chip, vista === 'todos' && styles.chipActive]}
+            onPress={() => setVista('todos')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="albums-outline"
+              size={14}
+              color={vista === 'todos' ? '#fff' : '#4B5563'}
+            />
+            <Text style={[styles.chipText, vista === 'todos' && styles.chipTextActive]}>
+              Todos
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.chip, vista === 'guardados' && styles.chipActive]}
+            onPress={() => setVista('guardados')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={vista === 'guardados' ? 'bookmark' : 'bookmark-outline'}
+              size={14}
+              color={vista === 'guardados' ? '#fff' : '#4B5563'}
+            />
+            <Text style={[styles.chipText, vista === 'guardados' && styles.chipTextActive]}>
+              Mis guardados ({eventosGuardados.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <FlatList
-        data={filteredEvents}
+      {mostrandoGuardadosPorFaltaDeRed && (
+        <View style={styles.offlineNotice}>
+          <Ionicons name="cloud-offline-outline" size={16} color="#92400E" />
+          <Text style={styles.offlineNoticeText}>
+            No pudimos cargar los eventos de la ciudad. Te mostramos los que guardaste.
+          </Text>
+        </View>
+      )}
+
+      <SectionList
+        sections={secciones}
         renderItem={renderEventCard}
+        renderSectionHeader={({ section }) => (
+          <Text style={styles.sectionHeader}>{section.title}</Text>
+        )}
         keyExtractor={(item: CityEvent) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        stickySectionHeadersEnabled={false}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No hay eventos programados por el momento.</Text>
+          <Text style={styles.emptyText}>
+            {vista === 'guardados'
+              ? 'Todavía no guardaste eventos. Tocá "Recordarme" en uno para verlo acá sin conexión.'
+              : 'No hay eventos programados por el momento.'}
+          </Text>
         }
       />
     </SafeAreaView>
@@ -169,9 +326,60 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#F3F4F6',
+  },
+  chipActive: {
+    backgroundColor: '#4F46E5',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  chipTextActive: {
+    color: '#fff',
+  },
+  offlineNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FEF3C7',
+  },
+  offlineNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+    lineHeight: 17,
+  },
   list: {
     padding: 16,
     gap: 16,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4B5563',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 4,
+    backgroundColor: '#F9FAFB',
+    paddingVertical: 2,
   },
   emptyText: {
     textAlign: 'center',
@@ -212,10 +420,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
   },
+  pastTag: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(17, 24, 39, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pastTagText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   cardContent: {
     padding: 16,
+    paddingBottom: 0,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   eventTitle: {
+    flex: 1,
     fontSize: 17,
     fontWeight: 'bold',
     color: '#111827',
@@ -237,6 +470,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 18,
   },
+  cardActions: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
   remindButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,6 +494,12 @@ const styles = StyleSheet.create({
   },
   remindTextActive: {
     color: '#fff',
+  },
+  remindButtonPast: {
+    backgroundColor: '#F3F4F6',
+  },
+  remindTextPast: {
+    color: '#6B7280',
   },
 });
 

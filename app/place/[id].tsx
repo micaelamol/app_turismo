@@ -1,8 +1,10 @@
 // app/place/[id].tsx
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import * as Haptics from 'expo-haptics';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -19,8 +21,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import FlechaLugar from '../../src/componentes/FlechaLugar';
+import ReproductorAudioguia from '../../src/componentes/ReproductorAudioguia';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
+import { useDescargas } from '../../src/hooks/useDescargas';
+import { obtenerAudioguiaLocal, estimarPesoBytes, formatearBytes, NivelDescarga } from '../../src/servicios/descargas';
+import { estadoApertura, formatearHorarios, precioLegible } from '../../src/utils/lugares';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -40,7 +47,12 @@ export default function PlaceDetailScreen() {
     ratePlace,
     getReviewsByPlaceId,
     addReview,
+    ubicacionActual,
+    actualizarUbicacion,
+    actualizandoUbicacion,
   } = usePlaces() as any;
+
+  const { estaDescargado, obtenerDescarga, descargar, eliminar, descargandoId, cargando: cargandoDescargas } = useDescargas();
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [justRated, setJustRated] = useState<number | null>(null);
@@ -50,18 +62,34 @@ export default function PlaceDetailScreen() {
   const [modalRating, setModalRating] = useState(5);
   const [modalComment, setModalComment] = useState('');
   const [modalPhoto, setModalPhoto] = useState('');
+  const [isDescargaModalVisible, setIsDescargaModalVisible] = useState(false);
+  const [nivelDescarga, setNivelDescarga] = useState<NivelDescarga>('liviano');
 
-  const place = getPlaceById(placeId);
+  const placeFromContext = getPlaceById(placeId);
+  const descargaFallback = !placeFromContext ? obtenerDescarga(placeId) : null;
+  const place = (placeFromContext ?? descargaFallback?.datos) as any;
+  const descargando = descargandoId === placeId;
   const placeReviews: any[] = getReviewsByPlaceId ? getReviewsByPlaceId(placeId) : [];
 
   if (!place) {
+    if (cargandoDescargas) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <Stack.Screen options={{ headerShown: false }} />
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color="#4F46E5" />
+            <Text style={styles.errorText}>Cargando...</Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={styles.container}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={styles.emptyContainer}>
           <Text style={styles.errorText}>Lugar no encontrado</Text>
           <TouchableOpacity style={styles.btnVolver} onPress={() => router.back()}>
-            <Text style={styles.btnVolverText}>Volver al Inicio</Text>
+            <Text style={styles.btnVolverText}>Volver</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -70,17 +98,36 @@ export default function PlaceDetailScreen() {
 
   const isVisited = visitedPlaces.includes(place.id);
 
-  // Galería: el backend manda "imagenes"; se mantiene "images" por compatibilidad
-  const galleryImages: string[] =
-    place.imagenes && place.imagenes.length > 0
-      ? place.imagenes
-      : place.images && place.images.length > 0
-      ? place.images
-      : [place.imageUrl];
+  // PRD §6: audioguía del lugar. Si ya se descargó, se reproduce el archivo local.
+  const audioguia = place.audioguia ?? null;
+  const audioLocal = obtenerAudioguiaLocal(place.id);
+  const audioUrl: string | null = audioguia?.url ? audioLocal ?? audioguia.url : null;
+
+  // PRD §1: el detalle muestra horario, teléfono y precio de entrada.
+  const horariosTexto = formatearHorarios(place.horarios);
+  const apertura = estadoApertura(place.horarios);
+  const precio = precioLegible(place.precioEntrada);
+
+  const descargaActual = obtenerDescarga(place.id);
+  const imagenesLocales = descargaActual?.galeriaLocal && descargaActual.galeriaLocal.length > 0
+    ? descargaActual.galeriaLocal
+    : null;
+
+  // Galería: si el lugar está descargado, usamos las imágenes locales;
+  // si no, las remotas del backend.
+  const galleryImages: string[] = imagenesLocales
+    ? imagenesLocales
+    : place.imagenes && place.imagenes.length > 0
+    ? place.imagenes
+    : place.images && place.images.length > 0
+    ? place.images
+    : [place.imageUrl];
 
   const handleToggleVisited = () => {
     const ahoraVisitado = toggleVisited(place.id);
     if (ahoraVisitado) {
+      // PRD §8: respuesta háptica al registrar una visita.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Alert.alert(
         '¡Visita Registrada! 🎉',
         `Has guardado tu visita a "${place.title}".\n\nPodés ver tu historial en la pestaña Recorrido.`
@@ -132,6 +179,47 @@ export default function PlaceDetailScreen() {
     Linking.openURL(url).catch((err) => {
       console.error('Error abriendo mapa:', err);
     });
+  };
+
+  // PRD §2: la flecha necesita la ubicación real del teléfono.
+  const handleUbicacion = async () => {
+    const coords = await actualizarUbicacion();
+    if (!coords) {
+      Alert.alert(
+        'Sin ubicación',
+        'No pudimos obtener tu ubicación. Revisá los permisos de la app en los ajustes del teléfono.'
+      );
+    }
+  };
+
+  const handleDescargar = async () => {
+    if (!place || descargando) return;
+    try {
+      await descargar(place as any, nivelDescarga);
+      setIsDescargaModalVisible(false);
+      Alert.alert('Descargado', 'El lugar quedó disponible sin conexión.');
+    } catch (e: any) {
+      Alert.alert('No se pudo descargar', e?.message ?? 'Intentá de nuevo.');
+    }
+  };
+
+  const handleEliminarDescarga = () => {
+    if (!place) return;
+    Alert.alert('Borrar descarga', `¿Quitar "${place.title}" de tus descargas?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Borrar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await eliminar(place.id);
+            Alert.alert('Borrado', 'Se liberó el espacio.');
+          } catch {
+            Alert.alert('Error', 'No se pudo borrar.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleScroll = (event: any) => {
@@ -231,6 +319,95 @@ export default function PlaceDetailScreen() {
             <Text style={styles.addressText}>{place.address}</Text>
           </View>
 
+          {/* Información: horario, entrada, teléfono, web y accesibilidad (PRD §1) */}
+          <View style={styles.infoCard}>
+            <Text style={styles.infoTitle}>Información</Text>
+
+            {apertura && (
+              <View style={styles.infoRow}>
+                <Ionicons
+                  name={apertura.abierto ? 'checkmark-circle' : 'time-outline'}
+                  size={18}
+                  color={apertura.abierto ? '#059669' : '#B45309'}
+                />
+                <Text
+                  style={[
+                    styles.infoText,
+                    { color: apertura.abierto ? '#059669' : '#B45309', fontWeight: '600' },
+                  ]}
+                >
+                  {apertura.texto}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={18} color="#4F46E5" />
+              <View style={{ flex: 1 }}>
+                {horariosTexto.length > 0 ? (
+                  horariosTexto.map((linea) => (
+                    <Text key={linea} style={styles.infoText}>
+                      {linea}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={styles.infoTextMuted}>Horario a confirmar</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Ionicons name="ticket-outline" size={18} color="#4F46E5" />
+              <Text style={styles.infoText}>Entrada: {precio}</Text>
+            </View>
+
+            {place.telefono ? (
+              <TouchableOpacity
+                style={styles.infoRow}
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL(`tel:${place.telefono}`)}
+                accessibilityRole="button"
+                accessibilityLabel={`Llamar al ${place.telefono}`}
+              >
+                <Ionicons name="call-outline" size={18} color="#4F46E5" />
+                <Text style={[styles.infoText, styles.infoLink]}>{place.telefono}</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {place.sitioWeb ? (
+              <TouchableOpacity
+                style={styles.infoRow}
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL(place.sitioWeb)}
+                accessibilityRole="link"
+                accessibilityLabel={`Abrir ${place.sitioWeb}`}
+              >
+                <Ionicons name="globe-outline" size={18} color="#4F46E5" />
+                <Text style={[styles.infoText, styles.infoLink]} numberOfLines={1}>
+                  {place.sitioWeb}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={styles.infoRow}>
+              <Ionicons
+                name={place.accesible ? 'accessibility-outline' : 'close-circle-outline'}
+                size={18}
+                color={place.accesible ? '#059669' : '#9CA3AF'}
+              />
+              <Text style={[styles.infoText, !place.accesible && { color: '#9CA3AF' }]}>
+                {place.accesible
+                  ? 'Accesible para silla de ruedas'
+                  : 'No accesible para silla de ruedas'}
+              </Text>
+            </View>
+          </View>
+
+          {/* PRD §2: flecha con brújula cuando el lugar no se ve */}
+          {ubicacionActual && (
+            <FlechaLugar origen={ubicacionActual} destino={place.coordinates} />
+          )}
+
           {/* CALIFICACIÓN INTERACTIVA */}
           <View style={styles.rateCard}>
             <View style={styles.rateCardHeader}>
@@ -293,9 +470,128 @@ export default function PlaceDetailScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* PRD §2: distancia y flecha hacia el lugar */}
+          {!ubicacionActual && (
+            <TouchableOpacity
+              style={styles.btnUbicacion}
+              onPress={handleUbicacion}
+              disabled={actualizandoUbicacion}
+              activeOpacity={0.8}
+            >
+              {actualizandoUbicacion ? (
+                <ActivityIndicator size="small" color="#4F46E5" />
+              ) : (
+                <Ionicons name="locate-outline" size={16} color="#4F46E5" />
+              )}
+              <Text style={styles.btnUbicacionText}>
+                {actualizandoUbicacion
+                  ? 'Buscando tu ubicación…'
+                  : 'Ver qué tan lejos estoy y para qué lado queda'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Modo offline */}
+          <View style={styles.offlineCard}>
+            <View style={styles.offlineHeader}>
+              <Ionicons name="cloud-download-outline" size={20} color="#4F46E5" />
+              <Text style={styles.offlineTitle}>Modo offline</Text>
+            </View>
+
+            {estaDescargado(place.id) ? (
+              <>
+                <Text style={styles.offlineStatus}>
+                  ✅ Disponible sin conexión ·{' '}
+                  {obtenerDescarga(place.id)?.nivel === 'completo' ? 'Completo' : 'Liviano'} ·{' '}
+                  {formatearBytes(obtenerDescarga(place.id)?.pesoBytes ?? 0)}
+                </Text>
+                <Text style={styles.offlineMeta}>
+                  Descargado el{' '}
+                  {obtenerDescarga(place.id)
+                    ? new Date(obtenerDescarga(place.id)!.descargadoEn).toLocaleDateString('es-AR', {
+                        day: 'numeric',
+                        month: 'long',
+                      })
+                    : ''}
+                </Text>
+
+                <View style={styles.offlineActions}>
+                  <TouchableOpacity
+                    style={styles.offlineBtn}
+                    onPress={() => {
+                      setNivelDescarga('liviano');
+                      setIsDescargaModalVisible(true);
+                    }}
+                    disabled={descargando}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="refresh-outline" size={16} color="#4F46E5" />
+                    <Text style={styles.offlineBtnText}>Actualizar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.offlineBtn, styles.offlineBtnDanger]}
+                    onPress={handleEliminarDescarga}
+                    disabled={descargando}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                    <Text style={[styles.offlineBtnText, styles.offlineBtnTextDanger]}>Borrar</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.offlineLink}
+                  onPress={() => router.push('/descargas')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.offlineLinkText}>Ver mis descargas</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#4F46E5" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.offlineStatus}>
+                  No descargado. Bajá la ficha para verla sin conexión.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.offlineBtnPrimary}
+                  onPress={() => {
+                    setNivelDescarga('liviano');
+                    setIsDescargaModalVisible(true);
+                  }}
+                  disabled={descargando}
+                  activeOpacity={0.85}
+                >
+                  {descargando ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={18} color="#fff" />
+                      <Text style={styles.offlineBtnPrimaryText}>Descargar</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
           {/* Descripción */}
           <Text style={styles.sectionTitle}>Acerca de este lugar</Text>
           <Text style={styles.description}>{place.description}</Text>
+
+          {/* Audioguía (PRD §6) */}
+          {audioguia && audioUrl && (
+            <ReproductorAudioguia
+              key={audioUrl}
+              url={audioUrl}
+              titulo={place.title}
+              duracionSegundos={audioguia.duracionSegundos}
+              idioma={audioguia.idioma}
+              disponibleOffline={!!audioLocal}
+            />
+          )}
 
           {/* Experiencias de la comunidad */}
           <View style={styles.reviewsHeader}>
@@ -415,6 +711,92 @@ export default function PlaceDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* MODAL: descarga offline */}
+      <Modal
+        visible={isDescargaModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsDescargaModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>¿Cuánto querés descargar?</Text>
+              <TouchableOpacity onPress={() => setIsDescargaModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>{place.title}</Text>
+
+            <TouchableOpacity
+              style={[styles.nivelOption, nivelDescarga === 'liviano' && styles.nivelOptionActive]}
+              onPress={() => setNivelDescarga('liviano')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.nivelRadio}>
+                {nivelDescarga === 'liviano' && <View style={styles.nivelRadioDot} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nivelTitle}>Liviano</Text>
+                <Text style={styles.nivelDesc}>
+                  {`Datos + portada${place.audioguia ? ' + audioguía' : ''} · ~${formatearBytes(
+                    estimarPesoBytes(place, 'liviano')
+                  )}`}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.nivelOption, nivelDescarga === 'completo' && styles.nivelOptionActive]}
+              onPress={() => setNivelDescarga('completo')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.nivelRadio}>
+                {nivelDescarga === 'completo' && <View style={styles.nivelRadioDot} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.nivelTitle}>Completo</Text>
+                <Text style={styles.nivelDesc}>
+                  {`Datos + galería completa${place.audioguia ? ' + audioguía' : ''} · ~${formatearBytes(
+                    estimarPesoBytes(place, 'completo')
+                  )}`}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <Text style={styles.modalHint}>
+              {place.audioguia
+                ? 'Se guardan las imágenes y la audioguía en el dispositivo para usarlas sin conexión.'
+                : 'Se guardan las imágenes en el dispositivo para usarlas sin conexión.'}
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setIsDescargaModalVisible(false)}
+                disabled={descargando}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalConfirm, descargando && styles.modalConfirmDisabled]}
+                onPress={handleDescargar}
+                disabled={descargando}
+              >
+                {descargando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Descargar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -534,6 +916,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#4F46E5',
   },
   btnAccionTextPrimary: { fontSize: 13, fontWeight: 'bold', color: '#fff' },
+  btnUbicacion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  btnUbicacionText: { fontSize: 12, fontWeight: '600', color: '#4F46E5', flexShrink: 1 },
 
   // Descripción y reseñas
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#111827', marginTop: 24, marginBottom: 8 },
@@ -597,4 +993,115 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   btnPublishText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+
+  // Información del lugar
+  infoCard: {
+    marginTop: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 10,
+  },
+  infoTitle: { fontSize: 15, fontWeight: 'bold', color: '#111827' },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  infoText: { flex: 1, fontSize: 13, color: '#374151', lineHeight: 19 },
+  infoTextMuted: { flex: 1, fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' },
+  infoLink: { color: '#4F46E5', textDecorationLine: 'underline' },
+
+  // Modo offline
+  offlineCard: {
+    marginTop: 24,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  offlineHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  offlineTitle: { fontSize: 15, fontWeight: 'bold', color: '#4F46E5' },
+  offlineStatus: { fontSize: 13, color: '#374151', lineHeight: 19 },
+  offlineMeta: { fontSize: 11, color: '#6B7280', marginTop: 4 },
+  offlineActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  offlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  offlineBtnText: { fontSize: 12, fontWeight: 'bold', color: '#4F46E5' },
+  offlineBtnDanger: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  offlineBtnTextDanger: { color: '#DC2626' },
+  offlineBtnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#4F46E5',
+  },
+  offlineBtnPrimaryText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  offlineLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 12,
+    paddingVertical: 6,
+  },
+  offlineLinkText: { fontSize: 12, fontWeight: '600', color: '#4F46E5' },
+
+  // Modal descarga
+  modalSubtitle: { fontSize: 13, color: '#6B7280', marginBottom: 14 },
+  nivelOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    marginBottom: 10,
+  },
+  nivelOptionActive: { borderColor: '#4F46E5', backgroundColor: '#EEF2FF' },
+  nivelRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#4F46E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nivelRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#4F46E5' },
+  nivelTitle: { fontSize: 14, fontWeight: 'bold', color: '#111827' },
+  nivelDesc: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  modalHint: { fontSize: 11, color: '#9CA3AF', marginTop: 4, lineHeight: 15 },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  modalCancelText: { fontSize: 13, fontWeight: 'bold', color: '#4B5563' },
+  modalConfirm: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#4F46E5',
+  },
+  modalConfirmDisabled: { backgroundColor: '#A5B4FC' },
+  modalConfirmText: { fontSize: 13, fontWeight: 'bold', color: '#fff' },
 });
