@@ -35,8 +35,21 @@
           "cameraPermission": "Permite el uso de la cámara para escanear tótems y tomar fotos de tus visitas."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permite mostrar qué lugares tenés cerca y para qué lado quedan."
+        }
+      ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
+      "expo-asset"
     ],
     "web": {
       "favicon": "./assets/favicon.png",
@@ -44,4 +57,3 @@
     }
   }
 }
-
