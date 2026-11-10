@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'turista' | 'habitante'>('turista');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'turista'>('turista');
 
   const handleLogin = async () => {
     const emailLimpio = email.trim();
@@ -47,7 +47,7 @@ export default function LoginScreen() {
     // 4. Iniciar sesión y navegar solo si no hubo error
     try {
       setLoading(true);
-      await login(emailLimpio, selectedRole);
+      await login(emailLimpio, password);
       router.replace('/(tabs)');
     } catch (error) {
       Alert.alert('Error', 'No se pudo iniciar sesión. Revisa tus datos.');
@@ -63,7 +63,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : "height"}
     >
       <View style={styles.header}>
         <View style={styles.iconCircle}>
@@ -77,7 +77,7 @@ export default function LoginScreen() {
         <Text style={styles.roleTitle}>Selecciona tu perfil:</Text>
         <View style={styles.roleContainer}>
           <TouchableOpacity
-            style={[styles.roleButton, selectedRole === 'turista' && styles.roleButtonActive]}
+            style={[styles.roleButton, selectedRole === 'admin' && styles.roleButtonActive]}
             onPress={() => setSelectedRole('turista')}
           >
             <Ionicons
@@ -91,15 +91,15 @@ export default function LoginScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.roleButton, selectedRole === 'habitante' && styles.roleButtonActive]}
-            onPress={() => setSelectedRole('habitante')}
+            style={[styles.roleButton, selectedRole === 'turista' && styles.roleButtonActive]}
+            onPress={() => setSelectedRole('turista')}
           >
             <Ionicons
               name="home-outline"
               size={20}
-              color={selectedRole === 'habitante' ? '#fff' : '#6B7280'}
+              color={selectedRole === 'turista' ? '#fff' : '#6B7280'}
             />
-            <Text style={[styles.roleButtonText, selectedRole === 'habitante' && styles.roleButtonTextActive]}>
+            <Text style={[styles.roleButtonText, selectedRole === 'turista' && styles.roleButtonTextActive]}>
               Colonense
             </Text>
           </TouchableOpacity>

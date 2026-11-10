@@ -5,6 +5,7 @@ import { guardarCategoriasEnSQLite, obtenerCategoriasDeSQLite } from './database
 
 
 
+
 /**
  * Obtiene el listado de categorías. 
  * Si el dispositivo cuenta con conexión a internet, consulta y sincroniza con PostgreSQL.

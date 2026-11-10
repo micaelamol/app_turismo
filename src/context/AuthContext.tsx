@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, UserRole } from '../types';
+import { httpClient } from '../servicios/client';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, role?: UserRole) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => void;
@@ -39,9 +40,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initSession();
   }, []);
 
-  const login = async (email: string, role: UserRole = 'turista') => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simular inicio de sesión
+    const log:User=await httpClient.post('/auth/ingreso',{email,password})
+    console.log("log: ",log)
+    setUser(log);
+
+    /* // Simular inicio de sesión
     setTimeout(() => {
       setUser({
         id: 'u-1',
@@ -51,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
       });
       setIsLoading(false);
-    }, 500);
+    }, 500); */
   };
 
   const register = async (name: string, email: string, role: UserRole) => {

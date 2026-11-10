@@ -127,7 +127,7 @@ export interface Usuario {
   avatar?: string;
   creadoEn?: string; // ISO 8601
   preferencias?: Preferencias;
-  role?: 'turista' | 'habitante';
+  role?: UserRole;
 }
 
 export interface Favorito {
@@ -194,7 +194,7 @@ export type RespuestaApi<T> = RespuestaApiExito<T> | RespuestaApiError;
 // -------------------------------------------------------------------------
 // Alias de compatibilidad
 // -------------------------------------------------------------------------
-export type UserRole = 'turista' | 'habitante';
+export type UserRole = 'admin' | 'turista';
 export type User = Usuario;
 export type Category = Categoria;
 export type CityEvent = Evento;
