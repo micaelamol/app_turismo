@@ -14,28 +14,55 @@ export interface FiltrosLugares {
 }
 
 /**
- * Obtiene el listado de lugares desde la API de PostgreSQL con filtros
+ * La API pagina: 20 por defecto. El PRD pide "ver el listado completo de lugares",
+ * así que pedimos el máximo que acepta `/lugares` (500) y, si el catálogo crece
+ * más que eso, seguimos con las páginas que falten leyendo `meta.total`.
+ */
+const POR_PAGINA_LUGARES = 500;
+
+/**
+ * Obtiene el listado de lugares desde la API de PostgreSQL con filtros.
+ * Devuelve TODOS los lugares que cumplen el filtro, no solo la primera página.
  */
 export async function obtenerLugares(
   filtros?: FiltrosLugares
 ): Promise<RespuestaApiExito<Lugar[]>> {
   const params = new URLSearchParams();
-  
+
   if (filtros?.categoriaId && filtros.categoriaId !== 'all') {
     params.append('categoriaId', filtros.categoriaId);
   }
+  // La API busca con `q` (PRD: "Buscar por nombre").
   if (filtros?.busqueda && filtros.busqueda.trim() !== '') {
-    params.append('busqueda', filtros.busqueda);
+    params.append('q', filtros.busqueda.trim());
+  }
+  params.append('porPagina', String(POR_PAGINA_LUGARES));
+
+  const todos: Lugar[] = [];
+  let pagina = 1;
+  let total = 0;
+
+  for (;;) {
+    params.set('pagina', String(pagina));
+
+    const url = `${process.env.EXPO_PUBLIC_API_URL}/lugares?${params.toString()}`;
+    const respuesta = await fetch(url);
+
+    if (!respuesta.ok) {
+      throw new Error('Error al obtener los lugares del servidor');
+    }
+
+    const cuerpo = (await respuesta.json()) as RespuestaApiExito<Lugar[]>;
+    const datos = Array.isArray(cuerpo.datos) ? cuerpo.datos : [];
+    todos.push(...datos);
+    total = cuerpo.meta?.total ?? todos.length;
+
+    // Sin datos, o ya tenemos todo el catálogo: no hay más páginas.
+    if (datos.length === 0 || todos.length >= total) break;
+    pagina += 1;
   }
 
-  const url = `${process.env.EXPO_PUBLIC_API_URL}/lugares?${params.toString()}`;
-  const respuesta = await fetch(url);
-  
-  if (!respuesta.ok) {
-    throw new Error('Error al obtener los lugares del servidor');
-  }
-
-  return await respuesta.json();
+  return { datos: todos, meta: { total, pagina: 1, porPagina: todos.length } };
 }
 
 /**

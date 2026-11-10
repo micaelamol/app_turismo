@@ -148,6 +148,13 @@ export interface Visita {
   fotoUri: string | null;
   nota: string | null;
   sincronizada: boolean;
+  /**
+   * Copia del nombre y la portada del lugar al momento de la visita.
+   * Sirve para que el recorrido siga mostrando el nombre aunque el lugar
+   * se dé de baja del catálogo o la app esté sin conexión (PRD §7).
+   */
+  lugarNombre?: string | null;
+  lugarImagen?: string | null;
 }
 
 export interface Review {

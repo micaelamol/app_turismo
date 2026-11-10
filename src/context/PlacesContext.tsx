@@ -1,14 +1,53 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { obtenerCategorias } from '../servicios/categories';
-import { obtenerEventos } from '../servicios/events';
-import { obtenerLugares } from '../servicios/places';
-import { Category, CityEvent, Coordinates, Lugar, Place, Review } from '../tipos';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Location from 'expo-location';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
+import { obtenerCategorias } from '../servicios/categories';
+import { cargarCatalogo, refrescarCatalogo } from '../servicios/catalogo';
+import { obtenerEventos } from '../servicios/events';
+import {
+  actualizarVisita,
+  eliminarVisitaDeDb,
+  eliminarVisitasDeIds,
+  eliminarVisitasDeLugar,
+  guardarSnapshotVisita,
+  guardarVisita,
+  inicializarVisitasDb,
+  listarVisitas,
+  migrarVisitasLegado,
+} from '../servicios/visitasDb';
+import {
+  Category,
+  CityEvent,
+  Coordinates,
+  Lugar,
+  OrigenVisita,
+  Place,
+  Review,
+  Visita,
+} from '../tipos';
+import { distanciaMetros } from '../utils/geo';
 
 // Centro de Colón, Entre Ríos
 const COLON_LAT = -32.2241;
 const COLON_LNG = -58.1411;
+
+// Clave propia (con prefijo distinto) para no chocar con la persistencia general.
+const CLAVE_FAVORITOS = '@colon:favoritos_v1';
+
+export type PermisoUbicacion = 'desconocido' | 'concedido' | 'denegado';
+
+export interface OpcionesVisita {
+  origen?: OrigenVisita;
+  fotoUri?: string | null;
+  nota?: string | null;
+}
+
+export interface LugarCercano {
+  lugar: Place;
+  distancia: number;
+}
 
 interface PlacesContextType {
   places: Place[];
@@ -47,6 +86,28 @@ interface PlacesContextType {
   getPlaceByQR: (qrCode: string) => Place | undefined;
   cargando: boolean;
   error: string | null;
+
+  // PRD §4: el recorrido son visitas reales (origen, fecha, foto, nota, sincronizada)
+  visitas: Visita[];
+  registrarVisita: (lugarId: string, opciones?: OpcionesVisita) => Promise<Visita>;
+  actualizarNotaVisita: (visitaId: string, nota: string) => Promise<void>;
+  eliminarVisita: (visitaId: string) => Promise<void>;
+  recargarVisitas: () => Promise<void>;
+  /** Visitas de lugares que ya no están publicados (catálogo viejo o dado de baja). */
+  visitasHuerfanas: Visita[];
+  limpiarVisitasHuerfanas: () => Promise<void>;
+
+  // PRD §2 y §4: ubicación real del teléfono y "lo que tenés cerca"
+  ubicacionActual: Coordinates | null;
+  permisoUbicacion: PermisoUbicacion;
+  actualizandoUbicacion: boolean;
+  actualizarUbicacion: () => Promise<Coordinates | null>;
+  lugaresCercanos: LugarCercano[];
+
+  // PRD §7: catálogo completo guardado en el teléfono
+  catalogoOffline: boolean;
+  catalogoActualizadoEn: string | null;
+  actualizarCatalogo: () => Promise<void>;
 }
 
 const PlacesContext = createContext<PlacesContextType | undefined>(undefined);
@@ -59,13 +120,26 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [categories, setCategories] = useState<Category[]>([]);
   const [events, setEvents] = useState<CityEvent[]>([]);
 
+  const { user } = useAuth();
+  const usuarioId = user?.id ?? 'local';
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [visitedPlaces, setVisitedPlaces] = useState<string[]>([]);
   const [userRatings, setUserRatings] = useState<Record<string, number>>({});
   const [eventReminders, setEventReminders] = useState<string[]>([]);
-  const [visitPhotos, setVisitPhotos] = useState<Record<string, string>>({});
+
+  // PRD §4: el recorrido son visitas reales, no una lista de IDs sueltos.
+  const [visitas, setVisitas] = useState<Visita[]>([]);
+
+  // PRD §2/§4: ubicación real del teléfono.
+  const [ubicacionActual, setUbicacionActual] = useState<Coordinates | null>(null);
+  const [permisoUbicacion, setPermisoUbicacion] = useState<PermisoUbicacion>('desconocido');
+  const [actualizandoUbicacion, setActualizandoUbicacion] = useState<boolean>(false);
+
+  // PRD §7: catálogo completo disponible sin conexión.
+  const [catalogoOffline, setCatalogoOffline] = useState<boolean>(false);
+  const [catalogoActualizadoEn, setCatalogoActualizadoEn] = useState<string | null>(null);
 
   // Consumir la capa de servicios asíncrona (Requisito obligatorio del PRD)
   useEffect(() => {
@@ -74,15 +148,37 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       try {
         setCargando(true);
         setError(null);
-        const [resLugares, resCategorias, resEventos] = await Promise.all([
-          obtenerLugares(),
+
+        // Primero el catálogo: si no hay red, `cargarCatalogo` devuelve la
+        // copia guardada en SQLite (PRD §7).
+        const catalogo = await cargarCatalogo();
+        if (!montado) return;
+
+        setRawPlaces(catalogo.datos);
+        setCatalogoOffline(catalogo.origen === 'cache');
+        setCatalogoActualizadoEn(catalogo.actualizadoEn);
+
+        const [resCategorias, resEventos] = await Promise.allSettled([
           obtenerCategorias(),
           obtenerEventos(),
         ]);
-        if (montado) {
-          setRawPlaces(resLugares.datos);
-          setCategories(resCategorias.datos);
-          setEvents(resEventos.datos);
+        if (!montado) return;
+
+        if (resCategorias.status === 'fulfilled') {
+          setCategories(resCategorias.value.datos);
+        } else {
+          console.warn('No se pudieron cargar las categorías', resCategorias.reason);
+        }
+
+        if (resEventos.status === 'fulfilled') {
+          setEvents(resEventos.value.datos);
+        } else {
+          console.warn('No se pudieron cargar los eventos', resEventos.reason);
+        }
+
+        // Aviso de red (PRD §7): catálogo local o eventos sin actualizar.
+        if (catalogo.origen === 'cache' || resEventos.status === 'rejected') {
+          setError('Sin conexión: estás viendo los datos guardados en el teléfono.');
         }
       } catch (err: any) {
         if (montado) {
@@ -101,50 +197,211 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // Cargar datos persistidos al montar
+  // PRD §4/§7: cargar la cola local de visitas y migrar el historial anterior.
+  const recargarVisitas = async (): Promise<void> => {
+    try {
+      await inicializarVisitasDb();
+      await migrarVisitasLegado(usuarioId);
+      const lista = await listarVisitas();
+      setVisitas(lista);
+    } catch (e) {
+      console.warn('Error al leer las visitas guardadas', e);
+    }
+  };
+
+  useEffect(() => {
+    recargarVisitas();
+    // El historial local pertenece al dispositivo, no a una sesión puntual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Favoritos guardados en el teléfono (PRD §3: la app recuerda lo que marcaste).
   useEffect(() => {
     (async () => {
       try {
-        const storedVisited = await AsyncStorage.getItem('@visitedPlaces');
-        if (storedVisited) {
-          setVisitedPlaces(JSON.parse(storedVisited));
-        }
-        const storedPhotos = await AsyncStorage.getItem('@visitPhotos');
-        if (storedPhotos) {
-          setVisitPhotos(JSON.parse(storedPhotos));
+        const guardados = await AsyncStorage.getItem(CLAVE_FAVORITOS);
+        if (!guardados) return;
+        const lista = JSON.parse(guardados);
+        if (Array.isArray(lista)) {
+          setFavorites(lista.filter((id) => typeof id === 'string'));
         }
       } catch (e) {
-        console.warn('Error al cargar datos locales persistidos', e);
+        console.warn('No se pudieron leer los favoritos guardados', e);
       }
     })();
   }, []);
 
-  // Helper para persistir visitados
-  const persistVisited = async (list: string[]) => {
+  // Visitas más recientes primero. `visitedPlaces` y `visitPhotos` se derivan
+  // de acá para que las pantallas viejas sigan funcionando igual.
+  const visitasOrdenadas = [...visitas].sort(
+    (a, b) => new Date(b.fechaHora).getTime() - new Date(a.fechaHora).getTime()
+  );
+
+  const visitedPlaces: string[] = [];
+  const visitPhotos: Record<string, string> = {};
+  for (const visita of visitasOrdenadas) {
+    if (!visitedPlaces.includes(visita.lugarId)) visitedPlaces.push(visita.lugarId);
+    if (visita.fotoUri && !visitPhotos[visita.lugarId]) {
+      visitPhotos[visita.lugarId] = visita.fotoUri;
+    }
+  }
+
+  /**
+   * Registra una visita del PRD: origen (qr/gps/manual), foto, nota y
+   * sincronizada: false. Se guarda primero en el teléfono (PRD §7).
+   */
+  const registrarVisita = async (
+    lugarId: string,
+    opciones: OpcionesVisita = {}
+  ): Promise<Visita> => {
+    let fotoUri = opciones.fotoUri ?? null;
+
+    // La foto de la cámara vive en caché: la copiamos a un lugar permanente.
+    if (
+      fotoUri &&
+      FileSystem.documentDirectory &&
+      !fotoUri.startsWith(FileSystem.documentDirectory)
+    ) {
+      try {
+        const destino = `${FileSystem.documentDirectory}visita-${lugarId}-${Date.now()}.jpg`;
+        await FileSystem.copyAsync({ from: fotoUri, to: destino });
+        fotoUri = destino;
+      } catch (e) {
+        console.warn('No se pudo guardar la foto de la visita', e);
+      }
+    }
+
+    const lugar = rawPlaces.find((p) => p.id === lugarId);
+
+    const visita: Visita = {
+      id: `vis-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      usuarioId,
+      lugarId,
+      fechaHora: new Date().toISOString(),
+      origen: opciones.origen ?? 'manual',
+      fotoUri,
+      nota: opciones.nota?.trim() ? opciones.nota.trim() : null,
+      sincronizada: false,
+      // Copia del lugar: el recorrido no pierde el nombre si el lugar
+      // se da de baja o si la app se abre sin conexión (PRD §7).
+      lugarNombre: lugar?.nombre ?? null,
+      lugarImagen: lugar?.imagenes?.[0] ?? null,
+    };
+
+    setVisitas((prev) => [visita, ...prev]);
+
     try {
-      await AsyncStorage.setItem('@visitedPlaces', JSON.stringify(list));
+      await guardarVisita(visita);
     } catch (e) {
-      console.warn('Error al guardar lugares visitados', e);
+      console.warn('No se pudo guardar la visita en SQLite', e);
+    }
+
+    return visita;
+  };
+
+  const actualizarNotaVisita = async (visitaId: string, nota: string): Promise<void> => {
+    const limpia = nota.trim() ? nota.trim() : null;
+    setVisitas((prev) => prev.map((v) => (v.id === visitaId ? { ...v, nota: limpia } : v)));
+    try {
+      await actualizarVisita(visitaId, { nota: limpia });
+    } catch (e) {
+      console.warn('No se pudo actualizar la nota de la visita', e);
+    }
+  };
+
+  const eliminarVisita = async (visitaId: string): Promise<void> => {
+    setVisitas((prev) => prev.filter((v) => v.id !== visitaId));
+    try {
+      await eliminarVisitaDeDb(visitaId);
+    } catch (e) {
+      console.warn('No se pudo borrar la visita', e);
+    }
+  };
+
+  /**
+   * Completa la copia de nombre/portada de las visitas viejas que se guardaron
+   * antes de que existiera ese snapshot. Solo toca visitas cuyo lugar sigue
+   * estando en el catálogo.
+   */
+  useEffect(() => {
+    if (rawPlaces.length === 0 || visitas.length === 0) return;
+
+    const pendientes = visitas.filter(
+      (v) => !v.lugarNombre && rawPlaces.some((p) => p.id === v.lugarId)
+    );
+    if (pendientes.length === 0) return;
+
+    (async () => {
+      for (const visita of pendientes) {
+        const lugar = rawPlaces.find((p) => p.id === visita.lugarId);
+        if (!lugar) continue;
+        const imagen = lugar.imagenes?.[0] ?? null;
+        try {
+          await guardarSnapshotVisita(visita.id, lugar.nombre, imagen);
+          setVisitas((prev) =>
+            prev.map((v) =>
+              v.id === visita.id ? { ...v, lugarNombre: lugar.nombre, lugarImagen: imagen } : v
+            )
+          );
+        } catch (e) {
+          console.warn('No se pudo completar la copia del lugar en la visita', e);
+        }
+      }
+    })();
+  }, [rawPlaces, visitas]);
+
+  /** Visitas que apuntan a un lugar que ya no está en el catálogo y sin copia. */
+  const visitasHuerfanas = visitas.filter(
+    (v) =>
+      rawPlaces.length > 0 &&
+      !rawPlaces.some((p) => p.id === v.lugarId) &&
+      !v.lugarNombre
+  );
+
+  const limpiarVisitasHuerfanas = async (): Promise<void> => {
+    // Sin catálogo cargado no podemos distinguir "huérfana" de "sin conexión".
+    if (rawPlaces.length === 0 || visitasHuerfanas.length === 0) return;
+
+    const ids = visitasHuerfanas.map((v) => v.id);
+    setVisitas((prev) => prev.filter((v) => !ids.includes(v.id)));
+    try {
+      await eliminarVisitasDeIds(ids);
+    } catch (e) {
+      console.warn('No se pudieron borrar las visitas huérfanas', e);
     }
   };
 
   const toggleVisited = (placeId: string): boolean => {
-    const isAlreadyVisited = visitedPlaces.includes(placeId);
-    const newList = isAlreadyVisited
-      ? visitedPlaces.filter((id) => id !== placeId)
-      : [...visitedPlaces, placeId];
-    setVisitedPlaces(newList);
-    persistVisited(newList);
-    return !isAlreadyVisited;
+    const yaVisitado = visitas.some((v) => v.lugarId === placeId);
+
+    if (yaVisitado) {
+      setVisitas((prev) => prev.filter((v) => v.lugarId !== placeId));
+      eliminarVisitasDeLugar(placeId).catch((e) =>
+        console.warn('No se pudieron borrar las visitas del lugar', e)
+      );
+      return false;
+    }
+
+    registrarVisita(placeId, { origen: 'manual' }).catch((e) =>
+      console.warn('No se pudo registrar la visita', e)
+    );
+    return true;
   };
 
   const saveVisitPhoto = async (placeId: string, uri: string) => {
     try {
-      const dest = `${FileSystem.documentDirectory}visita-${placeId}-${Date.now()}.jpg`;
-      await FileSystem.copyAsync({ from: uri, to: dest });
-      const next = { ...visitPhotos, [placeId]: dest };
-      setVisitPhotos(next);
-      await AsyncStorage.setItem('@visitPhotos', JSON.stringify(next));
+      const destino = `${FileSystem.documentDirectory}visita-${placeId}-${Date.now()}.jpg`;
+      await FileSystem.copyAsync({ from: uri, to: destino });
+
+      const visita = visitasOrdenadas.find((v) => v.lugarId === placeId);
+      if (visita) {
+        setVisitas((prev) =>
+          prev.map((v) => (v.id === visita.id ? { ...v, fotoUri: destino } : v))
+        );
+        await actualizarVisita(visita.id, { fotoUri: destino });
+      } else {
+        await registrarVisita(placeId, { origen: 'manual', fotoUri: destino });
+      }
     } catch (e) {
       console.warn('Error al guardar la foto de la visita', e);
     }
@@ -156,6 +413,80 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     latitude: COLON_LAT,
     longitude: COLON_LNG,
   });
+
+  // Si el usuario ya dio permiso antes, aprovechamos la última posición
+  // conocida sin volver a preguntar (el mapa tiene que andar sin permiso).
+  useEffect(() => {
+    let montado = true;
+    (async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        if (montado) setPermisoUbicacion('concedido');
+
+        const ultima = await Location.getLastKnownPositionAsync();
+        if (!ultima || !montado) return;
+
+        const coords: Coordinates = {
+          latitud: ultima.coords.latitude,
+          longitud: ultima.coords.longitude,
+          latitude: ultima.coords.latitude,
+          longitude: ultima.coords.longitude,
+        };
+        setUbicacionActual(coords);
+        setUserLocation(coords);
+      } catch (e) {
+        console.warn('No se pudo leer la última ubicación conocida', e);
+      }
+    })();
+    return () => {
+      montado = false;
+    };
+  }, []);
+
+  /** Pide permiso y devuelve la posición real del teléfono (PRD §2 y §4). */
+  const actualizarUbicacion = async (): Promise<Coordinates | null> => {
+    setActualizandoUbicacion(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setPermisoUbicacion('denegado');
+        return null;
+      }
+      setPermisoUbicacion('concedido');
+
+      const posicion = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords: Coordinates = {
+        latitud: posicion.coords.latitude,
+        longitud: posicion.coords.longitude,
+        latitude: posicion.coords.latitude,
+        longitude: posicion.coords.longitude,
+      };
+      setUbicacionActual(coords);
+      setUserLocation(coords);
+      return coords;
+    } catch (e) {
+      console.warn('No se pudo obtener la ubicación actual', e);
+      return null;
+    } finally {
+      setActualizandoUbicacion(false);
+    }
+  };
+
+  /** Vuelve a bajar el catálogo completo y lo guarda para uso offline. */
+  const actualizarCatalogo = async (): Promise<void> => {
+    try {
+      const catalogo = await refrescarCatalogo();
+      setRawPlaces(catalogo.datos);
+      setCatalogoOffline(catalogo.origen === 'cache');
+      setCatalogoActualizadoEn(catalogo.actualizadoEn);
+      if (catalogo.origen === 'red') setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'No se pudo actualizar el catálogo');
+    }
+  };
 
   const [reviews, setReviews] = useState<Review[]>([]);
 
@@ -197,6 +528,16 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   });
 
+  // PRD §2: "una lista de lo que tenés cerca ordenada por distancia".
+  const lugaresCercanos: LugarCercano[] = ubicacionActual
+    ? places
+        .map((lugar) => ({
+          lugar,
+          distancia: distanciaMetros(ubicacionActual, lugar.coordinates),
+        }))
+        .sort((a, b) => a.distancia - b.distancia)
+    : [];
+
   const addReview = (
     placeId: string,
     userName: string,
@@ -223,9 +564,18 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleFavorite = (placeId: string) => {
-    setFavorites((prev) =>
-      prev.includes(placeId) ? prev.filter((id) => id !== placeId) : [...prev, placeId]
-    );
+    setFavorites((prev) => {
+      const siguiente = prev.includes(placeId)
+        ? prev.filter((id) => id !== placeId)
+        : [...prev, placeId];
+
+      // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3).
+      AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(siguiente)).catch((e) =>
+        console.warn('No se pudieron guardar los favoritos', e)
+      );
+
+      return siguiente;
+    });
   };
 
   const isFavorite = (placeId: string): boolean => {
@@ -297,6 +647,21 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         getPlaceByQR,
         cargando,
         error,
+        visitas,
+        registrarVisita,
+        actualizarNotaVisita,
+        eliminarVisita,
+        recargarVisitas,
+        visitasHuerfanas,
+        limpiarVisitasHuerfanas,
+        ubicacionActual,
+        permisoUbicacion,
+        actualizandoUbicacion,
+        actualizarUbicacion,
+        lugaresCercanos,
+        catalogoOffline,
+        catalogoActualizadoEn,
+        actualizarCatalogo,
       }}
     >
       {children}
