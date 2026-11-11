@@ -1,19 +1,15 @@
 // app/_layout.tsx
+// Este import va primero: silencia el aviso de Expo Go antes de que
+// expo-notifications se cargue desde el hook de proximidad.
+import '../src/servicios/silenciarAvisosExpoGo';
+
 import React from 'react';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { LogBox } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import { PlacesProvider } from '../src/context/PlacesContext';
+import { useAvisosProximidad } from '../src/hooks/useAvisosProximidad';
 import { inicializarBaseDeDatos } from '../src/servicios/database';
-
-// Expo Go en Android muestra avisos de "push notifications" al importar
-// expo-notifications (SDK 53+). La app solo usa notificaciones LOCALES, que sí
-// funcionan en Expo Go, así que silenciamos esos avisos puntuales.
-LogBox.ignoreLogs([
-  'expo-notifications: Android Push notifications (remote notifications)',
-  '`expo-notifications` functionality is not fully supported in Expo Go',
-]);
 
 // Se ejecuta una sola vez al cargar el módulo, antes del primer render,
 // así las tablas ya existen cuando PlacesProvider pide los datos.
@@ -21,6 +17,13 @@ try {
   inicializarBaseDeDatos();
 } catch (err) {
   console.error('Error al inicializar SQLite:', err);
+}
+
+// El aviso de proximidad necesita los lugares y la ubicación, por eso va
+// adentro de PlacesProvider. No dibuja nada: solo escucha y avisa.
+function AvisosDeProximidad() {
+  useAvisosProximidad();
+  return null;
 }
 
 /**
@@ -33,6 +36,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <PlacesProvider>
+        <AvisosDeProximidad />
         <StatusBar style="dark" />
         <Slot />
       </PlacesProvider>

@@ -46,6 +46,32 @@ export async function guardarPreferenciasLocales(
   usuarioId = 'local'
 ): Promise<void> {
   await Storage.setItem(claveDe(usuarioId), JSON.stringify(preferencias));
+  avisarCambioDePreferencias(preferencias, usuarioId);
+}
+
+/**
+ * La pantalla de preferencias y el aviso de proximidad están separados.
+ * Con esto, al guardar el interruptor el aviso se entera en el momento
+ * (sin tener que cerrar y abrir la app).
+ */
+type OyentePreferencias = (preferencias: Preferencias, usuarioId: string) => void;
+const oyentesDePreferencias = new Set<OyentePreferencias>();
+
+export function alGuardarPreferencias(oyente: OyentePreferencias): () => void {
+  oyentesDePreferencias.add(oyente);
+  return () => {
+    oyentesDePreferencias.delete(oyente);
+  };
+}
+
+function avisarCambioDePreferencias(preferencias: Preferencias, usuarioId: string): void {
+  oyentesDePreferencias.forEach((oyente) => {
+    try {
+      oyente(preferencias, usuarioId);
+    } catch (error) {
+      console.warn('No se pudo avisar el cambio de preferencias', error);
+    }
+  });
 }
 
 /**
