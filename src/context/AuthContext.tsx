@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, role: UserRole) => Promise<void>;
+  register: (nombre: string, email: string, contrasena: string) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => void;
 }
@@ -66,19 +66,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const register = async (name: string, email: string, role: UserRole) => {
+  // El registro público siempre crea una cuenta con el rol común ("turista").
+  // El back devuelve la sesión armada, igual que el ingreso.
+  const register = async (nombre: string, email: string, contrasena: string) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setUser({
-        id: `u-${Date.now()}`,
-        name,
+    try {
+      const res = await httpClient.post<RespuestaIngreso>("/auth/registro", {
+        nombre,
         email,
-        role,
-        avatar:
-          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
+        contrasena,
       });
+      const { token, usuario } = res.data.datos;
+
+      await Promise.all([
+        SecureStore.setItemAsync("user_token", token),
+        SecureStore.setItemAsync("user_data", JSON.stringify(usuario)),
+      ]);
+      setUser(usuario);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   const logout = async () => {
