@@ -120,14 +120,11 @@ export interface Preferencias {
 
 export interface Usuario {
   id: string;
-  nombre?: string;
-  name?: string;
+  nombre: string;
   email: string;
-  avatarUrl?: string | null;
-  avatar?: string;
-  creadoEn?: string; // ISO 8601
-  preferencias?: Preferencias;
-  role?: UserRole;
+  avatarUrl: string | null;
+  creadoEn: string; // ISO 8601
+  preferencias: Preferencias;
 }
 
 export interface Favorito {

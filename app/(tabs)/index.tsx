@@ -174,7 +174,7 @@ export default function HomeScreen() {
               </View>
               <View style={styles.roleChip}>
                 <Text style={styles.roleChipText}>
-                  {user?.role === 'turista' ? '✈️ Turista' : '🏡 Colonense'}
+                  {user ? 'Mi cuenta' : 'Invitado'}
                 </Text>
               </View>
             </View>

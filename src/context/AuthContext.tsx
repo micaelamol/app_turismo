@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { RespuestaIngreso, User, UserRole } from "../types";
+import { RespuestaIngreso, User } from "../types";
 import { httpClient } from "../servicios/client";
 import { pedirBiometria, ResultadoBiometria } from "../servicios/biometria";
 import * as SecureStore from "expo-secure-store";
@@ -12,7 +12,6 @@ interface AuthContextType {
   register: (nombre: string, email: string, contrasena: string) => Promise<void>;
   entrarConBiometria: () => Promise<ResultadoBiometria>;
   logout: () => Promise<void>;
-  switchRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -144,15 +143,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  const switchRole = (role: UserRole) => {
-    if (user) {
-      setUser({ ...user, role });
-    }
-  };
-
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, entrarConBiometria, logout, switchRole }}
+      value={{ user, isLoading, login, register, entrarConBiometria, logout }}
     >
       {children}
     </AuthContext.Provider>

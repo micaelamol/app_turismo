@@ -21,9 +21,6 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"admin" | "turista">(
-    "turista",
-  );
 
   const handleLogin = async () => {
     const emailLimpio = email.trim();
@@ -111,53 +108,6 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.roleTitle}>Selecciona tu perfil:</Text>
-        <View style={styles.roleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.roleButton,
-              selectedRole === "turista" && styles.roleButtonActive,
-            ]}
-            onPress={() => setSelectedRole("turista")}
-          >
-            <Ionicons
-              name="airplane-outline"
-              size={20}
-              color={selectedRole === "turista" ? "#fff" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.roleButtonText,
-                selectedRole === "turista" && styles.roleButtonTextActive,
-              ]}
-            >
-              Turista
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.roleButton,
-              selectedRole === "admin" && styles.roleButtonActive,
-            ]}
-            onPress={() => setSelectedRole("admin")}
-          >
-            <Ionicons
-              name="home-outline"
-              size={20}
-              color={selectedRole === "admin" ? "#fff" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.roleButtonText,
-                selectedRole === "admin" && styles.roleButtonTextActive,
-              ]}
-            >
-              Colonense
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Correo Electrónico</Text>
           <View style={styles.inputContainer}>
@@ -280,22 +230,6 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginBottom: 8,
   },
-  roleContainer: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  roleButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  roleButtonActive: { backgroundColor: "#4F46E5", borderColor: "#4F46E5" },
-  roleButtonText: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
-  roleButtonTextActive: { color: "#fff" },
   inputGroup: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
   inputContainer: {
