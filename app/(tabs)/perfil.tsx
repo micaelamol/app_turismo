@@ -123,6 +123,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Datos de la cuenta: nombre y foto (PATCH /yo). */}
+        {user && (
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/cuenta')}
+            accessibilityLabel="Mi cuenta"
+          >
+            <View style={styles.menuIcon}>
+              <Ionicons name="person-outline" size={18} color="#4F46E5" />
+            </View>
+            <Text style={styles.menuText}>Mi cuenta</Text>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
+
         {/* Preferencias de la cuenta (PRD §5) */}
         <TouchableOpacity
           style={styles.menuItem}
