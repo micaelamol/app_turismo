@@ -2,6 +2,11 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { RespuestaIngreso, User } from "../types";
 import { httpClient } from "../servicios/client";
 import { pedirBiometria, ResultadoBiometria } from "../servicios/biometria";
+import {
+  aplicarTema,
+  guardarPreferenciasLocales,
+  PREFERENCIAS_INICIALES,
+} from "../servicios/preferencias";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 
@@ -11,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (nombre: string, email: string, contrasena: string) => Promise<void>;
   entrarConBiometria: () => Promise<ResultadoBiometria>;
+  actualizarUsuario: (usuario: User) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -45,7 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           return;
         }
 
-        setUser(JSON.parse(usuarioGuardado) as User);
+        const usuario = JSON.parse(usuarioGuardado) as User;
+        const preferencias = usuario.preferencias ?? PREFERENCIAS_INICIALES;
+
+        aplicarTema(preferencias.tema);
+        guardarPreferenciasLocales(preferencias, usuario.id).catch(() => {});
+        setUser(usuario);
       } catch (e) {
         console.error("Error restaurando sesión:", e);
         setUser(null);
@@ -57,6 +68,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     initSession();
   }, []);
 
+  // Guarda la sesión en SecureStore y deja las preferencias en el teléfono.
+  const guardarSesion = async (token: string, usuario: User) => {
+    const preferencias = usuario.preferencias ?? PREFERENCIAS_INICIALES;
+
+    await Promise.all([
+      SecureStore.setItemAsync("user_token", token),
+      SecureStore.setItemAsync("user_data", JSON.stringify(usuario)),
+      guardarPreferenciasLocales(preferencias, usuario.id),
+    ]);
+
+    aplicarTema(preferencias.tema);
+    setUser(usuario);
+  };
+
   const login = async (email: string, contrasena: string) => {
     setIsLoading(true);
     try {
@@ -64,13 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         contrasena,
       });
-      const { token, usuario } = res.data.datos;
-
-      await Promise.all([
-        SecureStore.setItemAsync("user_token", token),
-        SecureStore.setItemAsync("user_data", JSON.stringify(usuario)),
-      ]);
-      setUser(usuario);
+      await guardarSesion(res.data.datos.token, res.data.datos.usuario);
     } finally {
       setIsLoading(false);
     }
@@ -86,13 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         contrasena,
       });
-      const { token, usuario } = res.data.datos;
-
-      await Promise.all([
-        SecureStore.setItemAsync("user_token", token),
-        SecureStore.setItemAsync("user_data", JSON.stringify(usuario)),
-      ]);
-      setUser(usuario);
+      await guardarSesion(res.data.datos.token, res.data.datos.usuario);
     } finally {
       setIsLoading(false);
     }
@@ -109,9 +122,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const resultado = await pedirBiometria("Entrá a Colón Turismo");
     if (resultado === "ok") {
-      setUser(JSON.parse(usuarioGuardado) as User);
+      const usuario = JSON.parse(usuarioGuardado) as User;
+      aplicarTema((usuario.preferencias ?? PREFERENCIAS_INICIALES).tema);
+      setUser(usuario);
     }
     return resultado;
+  };
+
+  // Lo usan las pantallas que cambian datos de la cuenta (por ejemplo, preferencias).
+  const actualizarUsuario = async (usuario: User) => {
+    await SecureStore.setItemAsync("user_data", JSON.stringify(usuario));
+    setUser(usuario);
   };
 
   const logout = async () => {
@@ -145,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, entrarConBiometria, logout }}
+      value={{ user, isLoading, login, register, entrarConBiometria, actualizarUsuario, logout }}
     >
       {children}
     </AuthContext.Provider>

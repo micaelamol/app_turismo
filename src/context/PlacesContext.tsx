@@ -18,6 +18,7 @@ import {
   inicializarVisitasDb,
   listarVisitas,
   migrarVisitasLegado,
+  adoptarVisitasLocales,
 } from '../servicios/visitasDb';
 import {
   Category,
@@ -36,7 +37,12 @@ const COLON_LAT = -32.2241;
 const COLON_LNG = -58.1411;
 
 // Clave propia (con prefijo distinto) para no chocar con la persistencia general.
+// Cada cuenta tiene su propia copia; 'local' es lo hecho sin sesión.
 const CLAVE_FAVORITOS = '@colon:favoritos_v1';
+
+function claveFavoritos(usuarioId: string): string {
+  return `${CLAVE_FAVORITOS}:${usuarioId}`;
+}
 
 export type PermisoUbicacion = 'desconocido' | 'concedido' | 'denegado';
 
@@ -199,12 +205,18 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // PRD §4/§7: cargar la cola local de visitas y migrar el historial anterior.
+  // PRD §4/§7: cargar la cola local de visitas del usuario actual.
   const recargarVisitas = async (): Promise<void> => {
     try {
       await inicializarVisitasDb();
       await migrarVisitasLegado(usuarioId);
-      const lista = await listarVisitas();
+
+      // Lo que se hizo sin cuenta pasa a la cuenta que acaba de entrar.
+      if (usuarioId !== 'local') {
+        await adoptarVisitasLocales(usuarioId);
+      }
+
+      const lista = await listarVisitas(usuarioId);
       setVisitas(lista);
     } catch (e) {
       console.warn('Error al leer las visitas guardadas', e);
@@ -212,53 +224,77 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
+    setVisitas([]);
     recargarVisitas();
-    // El historial local pertenece al dispositivo, no a una sesión puntual.
+    // Cada cuenta ve su propio recorrido; al cerrar sesión vuelve a 'local'.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [usuarioId]);
 
-  // Favoritos guardados en el teléfono (PRD §3: la app recuerda lo que marcaste).
+  // Favoritos guardados en el teléfono, separados por cuenta (PRD §3 y §5).
+  // Al entrar, lo marcado como invitado y lo que ya tenía la cuenta en el
+  // servidor se suman a la copia local.
   useEffect(() => {
-    (async () => {
+    let vivo = true;
+    setFavorites([]);
+
+    const leerLista = (valor: string | null): string[] => {
+      if (!valor) return [];
       try {
-        const guardados = await AsyncStorage.getItem(CLAVE_FAVORITOS);
-        if (!guardados) return;
-        const lista = JSON.parse(guardados);
-        if (Array.isArray(lista)) {
-          setFavorites(lista.filter((id) => typeof id === 'string'));
+        const lista = JSON.parse(valor);
+        return Array.isArray(lista) ? lista.filter((id) => typeof id === 'string') : [];
+      } catch {
+        return [];
+      }
+    };
+
+    (async () => {
+      const clave = claveFavoritos(usuarioId);
+      let unidos: string[] = [];
+
+      try {
+        unidos = leerLista(await AsyncStorage.getItem(clave));
+
+        // Copia vieja, cuando todos los favoritos compartían una sola clave.
+        const legado = await AsyncStorage.getItem(CLAVE_FAVORITOS);
+        if (legado) {
+          unidos = Array.from(new Set([...unidos, ...leerLista(legado)]));
+          await AsyncStorage.removeItem(CLAVE_FAVORITOS);
         }
       } catch (e) {
         console.warn('No se pudieron leer los favoritos guardados', e);
       }
-    })();
-  }, []);
 
-  // PRD §5: los favoritos de la cuenta viven en el servidor. Al entrar se suman
-  // a los que ya había en el teléfono, así no se pierde nada de lo marcado
-  // antes de iniciar sesión.
-  useEffect(() => {
-    if (!user) return;
-    let vivo = true;
+      if (usuarioId !== 'local') {
+        try {
+          const invitado = leerLista(await AsyncStorage.getItem(claveFavoritos('local')));
+          if (invitado.length > 0) {
+            unidos = Array.from(new Set([...unidos, ...invitado]));
+            await AsyncStorage.removeItem(claveFavoritos('local'));
+          }
+        } catch (e) {
+          console.warn('No se pudieron pasar los favoritos de invitado', e);
+        }
 
-    (async () => {
-      try {
-        const delServidor = await obtenerFavoritos();
-        if (!vivo) return;
-
-        setFavorites((prev) => {
-          const unidos = Array.from(new Set([...prev, ...delServidor]));
-          AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(unidos)).catch(() => {});
-          return unidos;
-        });
-      } catch (e) {
-        console.warn('No se pudieron bajar los favoritos de la cuenta', e);
+        try {
+          const delServidor = await obtenerFavoritos();
+          unidos = Array.from(new Set([...unidos, ...delServidor]));
+        } catch (e) {
+          console.warn('No se pudieron bajar los favoritos de la cuenta', e);
+        }
       }
+
+      if (!vivo) return;
+
+      setFavorites(unidos);
+      AsyncStorage.setItem(clave, JSON.stringify(unidos)).catch((e) =>
+        console.warn('No se pudieron guardar los favoritos', e)
+      );
     })();
 
     return () => {
       vivo = false;
     };
-  }, [user?.id]);
+  }, [usuarioId]);
 
   // PRD §4: las visitas de la cuenta también viven en el servidor. Al entrar se
   // bajan y se copian a recorrido_offline.db, así el recorrido arranca con datos
@@ -443,7 +479,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (yaVisitado) {
       setVisitas((prev) => prev.filter((v) => v.lugarId !== placeId));
-      eliminarVisitasDeLugar(placeId).catch((e) =>
+      eliminarVisitasDeLugar(placeId, usuarioId).catch((e) =>
         console.warn('No se pudieron borrar las visitas del lugar', e)
       );
       return false;
@@ -640,8 +676,9 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setFavorites(siguiente);
 
-    // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3).
-    AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(siguiente)).catch((e) =>
+    // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3), pero cada
+    // cuenta (y el invitado) guarda los suyos.
+    AsyncStorage.setItem(claveFavoritos(usuarioId), JSON.stringify(siguiente)).catch((e) =>
       console.warn('No se pudieron guardar los favoritos', e)
     );
 

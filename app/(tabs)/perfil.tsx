@@ -114,6 +114,19 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Visitados</Text>
           </View>
         </View>
+
+        {/* Preferencias de la cuenta (PRD §5) */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/preferencias')}
+          accessibilityLabel="Preferencias"
+        >
+          <View style={styles.menuIcon}>
+            <Ionicons name="settings-outline" size={18} color="#4F46E5" />
+          </View>
+          <Text style={styles.menuText}>Preferencias</Text>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </TouchableOpacity>
       </View>
 
       {/* Pestañas */}
@@ -224,6 +237,27 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   statLabel: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
   tabHeader: {
     flexDirection: 'row',
     backgroundColor: '#fff',

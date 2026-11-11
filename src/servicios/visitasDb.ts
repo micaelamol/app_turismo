@@ -59,6 +59,7 @@ export function inicializarVisitasDb(): Promise<void> {
         );
         CREATE INDEX IF NOT EXISTS idx_visitas_fecha ON visitas (fecha_hora DESC);
         CREATE INDEX IF NOT EXISTS idx_visitas_lugar ON visitas (lugar_id);
+        CREATE INDEX IF NOT EXISTS idx_visitas_usuario ON visitas (usuario_id);
         CREATE TABLE IF NOT EXISTS recorrido_meta (
           clave TEXT PRIMARY KEY NOT NULL,
           valor TEXT NOT NULL
@@ -97,22 +98,31 @@ function filaAVisita(fila: VisitaRow): Visita {
   };
 }
 
-/** Visitas más recientes primero. */
-export async function listarVisitas(): Promise<Visita[]> {
+/**
+ * Visitas más recientes primero, solo las del usuario indicado.
+ * `'local'` son las que se hicieron sin cuenta.
+ */
+export async function listarVisitas(usuarioId: string): Promise<Visita[]> {
   await inicializarVisitasDb();
   const db = await abrirBase();
   const filas = await db.getAllAsync<VisitaRow>(
-    'SELECT * FROM visitas ORDER BY fecha_hora DESC, id DESC;'
+    'SELECT * FROM visitas WHERE usuario_id = ? ORDER BY fecha_hora DESC, id DESC;',
+    [usuarioId]
   );
   return filas.map(filaAVisita);
 }
 
-export async function listarVisitasDeLugar(lugarId: string): Promise<Visita[]> {
+export async function listarVisitasDeLugar(
+  lugarId: string,
+  usuarioId: string
+): Promise<Visita[]> {
   await inicializarVisitasDb();
   const db = await abrirBase();
   const filas = await db.getAllAsync<VisitaRow>(
-    'SELECT * FROM visitas WHERE lugar_id = ? ORDER BY fecha_hora DESC, id DESC;',
-    [lugarId]
+    `SELECT * FROM visitas
+     WHERE lugar_id = ? AND usuario_id = ?
+     ORDER BY fecha_hora DESC, id DESC;`,
+    [lugarId, usuarioId]
   );
   return filas.map(filaAVisita);
 }
@@ -184,11 +194,17 @@ export async function eliminarVisitaDeDb(id: string): Promise<void> {
   await db.runAsync('DELETE FROM visitas WHERE id = ?;', [id]);
 }
 
-/** "Quitar de visitados" en la ficha del lugar borra todas sus visitas. */
-export async function eliminarVisitasDeLugar(lugarId: string): Promise<void> {
+/** "Quitar de visitados" en la ficha del lugar borra las visitas de ese usuario. */
+export async function eliminarVisitasDeLugar(
+  lugarId: string,
+  usuarioId: string
+): Promise<void> {
   await inicializarVisitasDb();
   const db = await abrirBase();
-  await db.runAsync('DELETE FROM visitas WHERE lugar_id = ?;', [lugarId]);
+  await db.runAsync('DELETE FROM visitas WHERE lugar_id = ? AND usuario_id = ?;', [
+    lugarId,
+    usuarioId,
+  ]);
 }
 
 /** Borra varias visitas de una vez (limpieza de huérfanas). */
@@ -217,22 +233,36 @@ export async function guardarSnapshotVisita(
   );
 }
 
-export async function contarVisitas(): Promise<number> {
+export async function contarVisitas(usuarioId: string): Promise<number> {
   await inicializarVisitasDb();
   const db = await abrirBase();
   const fila = await db.getFirstAsync<{ total: number }>(
-    'SELECT COUNT(*) AS total FROM visitas;'
+    'SELECT COUNT(*) AS total FROM visitas WHERE usuario_id = ?;',
+    [usuarioId]
   );
   return fila?.total ?? 0;
 }
 
-export async function contarVisitasSinSincronizar(): Promise<number> {
+export async function contarVisitasSinSincronizar(usuarioId: string): Promise<number> {
   await inicializarVisitasDb();
   const db = await abrirBase();
   const fila = await db.getFirstAsync<{ total: number }>(
-    'SELECT COUNT(*) AS total FROM visitas WHERE sincronizada = 0;'
+    'SELECT COUNT(*) AS total FROM visitas WHERE sincronizada = 0 AND usuario_id = ?;',
+    [usuarioId]
   );
   return fila?.total ?? 0;
+}
+
+/**
+ * Al iniciar sesión, las visitas hechas sin cuenta pasan a ser de esa cuenta.
+ * Se corre una sola vez por ingreso y no toca las visitas de otras cuentas.
+ */
+export async function adoptarVisitasLocales(usuarioId: string): Promise<void> {
+  await inicializarVisitasDb();
+  const db = await abrirBase();
+  await db.runAsync("UPDATE visitas SET usuario_id = ? WHERE usuario_id = 'local';", [
+    usuarioId,
+  ]);
 }
 
 /**

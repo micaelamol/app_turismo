@@ -8,6 +8,7 @@ import { EstadoEvento, Evento } from '../tipos';
 
 export interface EventoGuardado {
   id: string;
+  usuarioId: string;
   titulo: string;
   descripcion: string;
   lugarId: string | null;
@@ -23,6 +24,7 @@ export interface EventoGuardado {
 
 interface EventoGuardadoRow {
   id: string;
+  usuario_id: string;
   titulo: string;
   descripcion: string;
   lugar_id: string | null;
@@ -56,9 +58,14 @@ export function inicializarAgendaDb(): Promise<void> {
   if (!inicializacion) {
     inicializacion = (async () => {
       const db = await abrirBase();
+
+      // Cada fila pertenece a una cuenta. Sin sesión, `usuario_id` es 'local'.
+      // La clave primaria es compuesta para que dos cuentas puedan guardar el
+      // mismo evento sin pisarse.
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS eventos_guardados (
-          id TEXT PRIMARY KEY NOT NULL,
+          usuario_id TEXT NOT NULL DEFAULT 'local',
+          id TEXT NOT NULL,
           titulo TEXT NOT NULL,
           descripcion TEXT NOT NULL DEFAULT '',
           lugar_id TEXT,
@@ -69,10 +76,51 @@ export function inicializarAgendaDb(): Promise<void> {
           precio REAL,
           estado TEXT NOT NULL DEFAULT 'programado',
           notificacion_id TEXT,
-          guardado_en TEXT NOT NULL
+          guardado_en TEXT NOT NULL,
+          PRIMARY KEY (usuario_id, id)
         );
+      `);
+
+      // Agenda creada antes de separar por cuenta: se migra sin perder nada.
+      const columnas = await db.getAllAsync<{ name: string }>(
+        'PRAGMA table_info(eventos_guardados);'
+      );
+      const nombres = new Set(columnas.map((columna) => columna.name));
+
+      if (!nombres.has('usuario_id')) {
+        await db.execAsync(`
+          ALTER TABLE eventos_guardados RENAME TO eventos_guardados_viejo;
+          CREATE TABLE eventos_guardados (
+            usuario_id TEXT NOT NULL DEFAULT 'local',
+            id TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            descripcion TEXT NOT NULL DEFAULT '',
+            lugar_id TEXT,
+            direccion_libre TEXT,
+            inicio TEXT NOT NULL,
+            fin TEXT,
+            imagen_url TEXT,
+            precio REAL,
+            estado TEXT NOT NULL DEFAULT 'programado',
+            notificacion_id TEXT,
+            guardado_en TEXT NOT NULL,
+            PRIMARY KEY (usuario_id, id)
+          );
+          INSERT INTO eventos_guardados
+            (usuario_id, id, titulo, descripcion, lugar_id, direccion_libre, inicio,
+             fin, imagen_url, precio, estado, notificacion_id, guardado_en)
+          SELECT 'local', id, titulo, descripcion, lugar_id, direccion_libre, inicio,
+             fin, imagen_url, precio, estado, notificacion_id, guardado_en
+          FROM eventos_guardados_viejo;
+          DROP TABLE eventos_guardados_viejo;
+        `);
+      }
+
+      await db.execAsync(`
         CREATE INDEX IF NOT EXISTS idx_eventos_guardados_inicio
           ON eventos_guardados (inicio);
+        CREATE INDEX IF NOT EXISTS idx_eventos_guardados_usuario
+          ON eventos_guardados (usuario_id);
       `);
     })().catch((error) => {
       // Si falla, permitimos reintentar en la próxima llamada.
@@ -86,6 +134,7 @@ export function inicializarAgendaDb(): Promise<void> {
 function filaAEvento(fila: EventoGuardadoRow): EventoGuardado {
   return {
     id: fila.id,
+    usuarioId: fila.usuario_id,
     titulo: fila.titulo,
     descripcion: fila.descripcion ?? '',
     lugarId: fila.lugar_id,
@@ -100,28 +149,33 @@ function filaAEvento(fila: EventoGuardadoRow): EventoGuardado {
   };
 }
 
-export async function listarEventosGuardados(): Promise<EventoGuardado[]> {
+export async function listarEventosGuardados(usuarioId: string): Promise<EventoGuardado[]> {
   await inicializarAgendaDb();
   const db = await abrirBase();
   const filas = await db.getAllAsync<EventoGuardadoRow>(
-    'SELECT * FROM eventos_guardados ORDER BY inicio ASC;'
+    'SELECT * FROM eventos_guardados WHERE usuario_id = ? ORDER BY inicio ASC;',
+    [usuarioId]
   );
   return filas.map(filaAEvento);
 }
 
-export async function obtenerEventoGuardado(id: string): Promise<EventoGuardado | null> {
+export async function obtenerEventoGuardado(
+  id: string,
+  usuarioId: string
+): Promise<EventoGuardado | null> {
   await inicializarAgendaDb();
   const db = await abrirBase();
   const fila = await db.getFirstAsync<EventoGuardadoRow>(
-    'SELECT * FROM eventos_guardados WHERE id = ?;',
-    [id]
+    'SELECT * FROM eventos_guardados WHERE id = ? AND usuario_id = ?;',
+    [id, usuarioId]
   );
   return fila ? filaAEvento(fila) : null;
 }
 
 export async function guardarEventoEnDb(
   evento: Evento,
-  notificacionId: string | null
+  notificacionId: string | null,
+  usuarioId: string
 ): Promise<void> {
   await inicializarAgendaDb();
   const db = await abrirBase();
@@ -134,10 +188,11 @@ export async function guardarEventoEnDb(
 
   await db.runAsync(
     `INSERT OR REPLACE INTO eventos_guardados
-       (id, titulo, descripcion, lugar_id, direccion_libre, inicio, fin,
+       (usuario_id, id, titulo, descripcion, lugar_id, direccion_libre, inicio, fin,
         imagen_url, precio, estado, notificacion_id, guardado_en)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
+      usuarioId,
       evento.id,
       titulo,
       descripcion,
@@ -156,20 +211,38 @@ export async function guardarEventoEnDb(
 
 export async function actualizarNotificacionEvento(
   id: string,
-  notificacionId: string | null
+  notificacionId: string | null,
+  usuarioId: string
 ): Promise<void> {
   await inicializarAgendaDb();
   const db = await abrirBase();
   await db.runAsync(
-    'UPDATE eventos_guardados SET notificacion_id = ? WHERE id = ?;',
-    [notificacionId, id]
+    'UPDATE eventos_guardados SET notificacion_id = ? WHERE id = ? AND usuario_id = ?;',
+    [notificacionId, id, usuarioId]
   );
 }
 
-export async function eliminarEventoDeDb(id: string): Promise<void> {
+export async function eliminarEventoDeDb(id: string, usuarioId: string): Promise<void> {
   await inicializarAgendaDb();
   const db = await abrirBase();
-  await db.runAsync('DELETE FROM eventos_guardados WHERE id = ?;', [id]);
+  await db.runAsync('DELETE FROM eventos_guardados WHERE id = ? AND usuario_id = ?;', [
+    id,
+    usuarioId,
+  ]);
+}
+
+/**
+ * Al iniciar sesión, los eventos guardados sin cuenta pasan a ser de esa cuenta.
+ * Si la cuenta ya tenía el mismo evento, se descarta la copia de invitado.
+ */
+export async function adoptarEventosLocales(usuarioId: string): Promise<void> {
+  await inicializarAgendaDb();
+  const db = await abrirBase();
+  await db.runAsync(
+    "UPDATE OR IGNORE eventos_guardados SET usuario_id = ? WHERE usuario_id = 'local';",
+    [usuarioId]
+  );
+  await db.runAsync("DELETE FROM eventos_guardados WHERE usuario_id = 'local';");
 }
 
 /** Convierte la copia local a la forma que espera la pantalla de detalle. */

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   EventoGuardado,
+  adoptarEventosLocales,
   eliminarEventoDeDb,
   guardarEventoEnDb,
   inicializarAgendaDb,
@@ -28,6 +29,9 @@ export interface ResultadoAccionAgenda {
 }
 
 export function useAgendaEventos() {
+  const { user } = useAuth();
+  const usuarioId = user?.id ?? 'local';
+
   const [eventosGuardados, setEventosGuardados] = useState<EventoGuardado[]>([]);
   const [cargandoAgenda, setCargandoAgenda] = useState<boolean>(true);
   const [errorAgenda, setErrorAgenda] = useState<string | null>(null);
@@ -36,7 +40,7 @@ export function useAgendaEventos() {
     try {
       setErrorAgenda(null);
       await inicializarAgendaDb();
-      const lista = await listarEventosGuardados();
+      const lista = await listarEventosGuardados(usuarioId);
       setEventosGuardados(lista);
     } catch (error) {
       console.warn('No se pudo leer la agenda local', error);
@@ -44,7 +48,7 @@ export function useAgendaEventos() {
     } finally {
       setCargandoAgenda(false);
     }
-  }, []);
+  }, [usuarioId]);
 
   // Al volver a la pantalla (por ejemplo, después de guardar en el detalle)
   // se relee la base para reflejar el estado real.
@@ -54,25 +58,27 @@ export function useAgendaEventos() {
     }, [recargar])
   );
 
-  const { user } = useAuth();
-
   // PRD §3: los eventos guardados de la cuenta están en el servidor. Al entrar
-  // se bajan y se suman a los que ya había en el teléfono.
+  // se bajan y se suman a los que ya había en el teléfono. Lo que se guardó sin
+  // cuenta pasa a ser de la cuenta que acaba de entrar.
   useEffect(() => {
-    if (!user) return;
     let vivo = true;
 
     (async () => {
       try {
-        const delServidor = await obtenerEventosGuardadosDeLaCuenta();
-        if (!vivo) return;
+        if (usuarioId !== 'local') {
+          await adoptarEventosLocales(usuarioId);
 
-        const locales = await listarEventosGuardados();
-        const yaEstaban = new Set(locales.map((evento) => evento.id));
+          const delServidor = await obtenerEventosGuardadosDeLaCuenta();
+          if (!vivo) return;
 
-        for (const evento of delServidor) {
-          if (!yaEstaban.has(evento.id)) {
-            await guardarEventoEnDb(evento, null);
+          const locales = await listarEventosGuardados(usuarioId);
+          const yaEstaban = new Set(locales.map((evento) => evento.id));
+
+          for (const evento of delServidor) {
+            if (!yaEstaban.has(evento.id)) {
+              await guardarEventoEnDb(evento, null, usuarioId);
+            }
           }
         }
 
@@ -85,7 +91,7 @@ export function useAgendaEventos() {
     return () => {
       vivo = false;
     };
-  }, [user?.id, recargar]);
+  }, [usuarioId, recargar]);
 
   const estaGuardado = useCallback(
     (eventoId: string) => eventosGuardados.some((evento) => evento.id === eventoId),
@@ -122,7 +128,7 @@ export function useAgendaEventos() {
 
       try {
         const recordatorio = await programarRecordatorioEvento(evento);
-        await guardarEventoEnDb(evento, recordatorio.notificacionId ?? null);
+        await guardarEventoEnDb(evento, recordatorio.notificacionId ?? null, usuarioId);
 
         // Con sesión, el evento también queda guardado en la cuenta.
         if (user) {
@@ -146,7 +152,7 @@ export function useAgendaEventos() {
         };
       }
     },
-    [eventosGuardados, recargar, user]
+    [eventosGuardados, recargar, user, usuarioId]
   );
 
   const quitarEvento = useCallback(
@@ -155,7 +161,7 @@ export function useAgendaEventos() {
 
       try {
         await cancelarRecordatorio(guardado?.notificacionId ?? null);
-        await eliminarEventoDeDb(eventoId);
+        await eliminarEventoDeDb(eventoId, usuarioId);
 
         // Con sesión, también se quita de la cuenta.
         if (user) {
@@ -174,7 +180,7 @@ export function useAgendaEventos() {
         };
       }
     },
-    [eventosGuardados, recargar, user]
+    [eventosGuardados, recargar, user, usuarioId]
   );
 
   return {
