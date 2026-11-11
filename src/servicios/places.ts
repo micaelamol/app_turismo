@@ -73,7 +73,6 @@ export async function obtenerLugarPorId(
   id: string
 ): Promise<RespuestaApi<Lugar>> {
   const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/${id}`);
-  const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/${id}`);
   
   if (!respuesta.ok) {
     const error: RespuestaApiError = {
@@ -94,7 +93,6 @@ export async function obtenerLugarPorId(
 export async function obtenerLugarPorQr(
   codigoQr: string
 ): Promise<RespuestaApi<Lugar>> {
-  const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/qr/${encodeURIComponent(codigoQr)}`);
   const respuesta = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/lugares/qr/${encodeURIComponent(codigoQr)}`);
   
   if (!respuesta.ok) {

@@ -107,16 +107,16 @@ export default function ProfileScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.miniSwitch, user?.role === 'habitante' && styles.miniSwitchActive]}
-            onPress={() => switchRole('habitante')}
+            style={[styles.miniSwitch, user?.role === 'turista' && styles.miniSwitchActive]}
+            onPress={() => switchRole('turista')}
           >
             <Text
               style={[
                 styles.miniSwitchText,
-                user?.role === 'habitante' && styles.miniSwitchTextActive,
+                user?.role === 'turista' && styles.miniSwitchTextActive,
               ]}
             >
-              Habitante
+              turista
             </Text>
           </TouchableOpacity>
         </View>

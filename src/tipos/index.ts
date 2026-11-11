@@ -191,6 +191,18 @@ export interface RespuestaApiError {
 
 export type RespuestaApi<T> = RespuestaApiExito<T> | RespuestaApiError;
 
+// datos que llegan de /auth/ingreso
+export interface DatosIngreso {
+  token: string;
+  usuario: Usuario;
+}
+
+export interface RespuestaIngreso {
+  datos: DatosIngreso;
+  meta: null;
+}
+
+//====================================================
 // -------------------------------------------------------------------------
 // Alias de compatibilidad
 // -------------------------------------------------------------------------
@@ -198,3 +210,4 @@ export type UserRole = 'admin' | 'turista';
 export type User = Usuario;
 export type Category = Categoria;
 export type CityEvent = Evento;
+
