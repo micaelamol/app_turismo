@@ -1,7 +1,17 @@
 // app/(tabs)/_layout.tsx
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import { useAuth } from '../../src/context/AuthContext';
+
 export default function TabsLayout() {
+  const { user, modoInvitado } = useAuth();
+
+  // Sin cuenta y sin elegir "Explorar como Invitado" no se entra a las
+  // pestañas: se muestra el login (ahí está el botón de huella si hay sesión).
+  if (!user && !modoInvitado) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs screenOptions={{
       tabBarActiveTintColor: '#A8422A',

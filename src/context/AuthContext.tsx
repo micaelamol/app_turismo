@@ -16,8 +16,11 @@ interface AuthContextType {
   isLoading: boolean;
   /** Hay token guardado: se puede ofrecer el reingreso con huella o rostro. */
   haySesionGuardada: boolean;
+  /** El usuario eligió "Explorar como Invitado": puede ver las pestañas sin cuenta. */
+  modoInvitado: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (nombre: string, email: string, contrasena: string) => Promise<void>;
+  entrarComoInvitado: () => void;
   entrarConBiometria: () => Promise<ResultadoBiometria>;
   actualizarUsuario: (usuario: User) => Promise<void>;
   logout: () => Promise<void>;
@@ -31,6 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [haySesionGuardada, setHaySesionGuardada] = useState<boolean>(false);
+  const [modoInvitado, setModoInvitado] = useState<boolean>(false);
 
   // Deja al usuario en memoria, en SecureStore y aplica sus preferencias.
   const aplicarUsuario = async (usuario: Usuario) => {
@@ -44,6 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     aplicarTema(preferencias.tema);
     activarSesion(true);
     setHaySesionGuardada(true);
+    setModoInvitado(false);
     setUser(usuario);
   };
 
@@ -63,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     activarSesion(false);
     aplicarTema("sistema");
     setHaySesionGuardada(false);
+    setModoInvitado(false);
     setUser(null);
   };
 
@@ -86,6 +92,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     // Restaurar la sesión: el token y el usuario quedan guardados en SecureStore.
+    // Ojo: acá NO se pide la huella. En Android, si el diálogo del sistema se
+    // abre apenas arranca Expo Go, la promesa de authenticateAsync queda
+    // colgada para siempre y la app se queda en la pantalla de arranque.
+    // Por eso primero mostramos el login y el desbloqueo se pide desde el
+    // botón de huella, con la app ya en primer plano.
     const initSession = async () => {
       try {
         const [token, usuarioGuardado] = await Promise.all([
@@ -99,27 +110,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         setHaySesionGuardada(true);
-
-        // Si el teléfono tiene huella o rostro configurado, la sesión se abre
-        // con eso. Si el usuario cancela, no lo dejamos adentro: vuelve al
-        // login, donde puede reintentar o escribir la contraseña.
-        const resultado = await pedirBiometria("Entrá a Colón Turismo");
-        if (resultado === "cancelada" || resultado === "fallida") {
-          setUser(null);
-          return;
-        }
-
-        const usuario = JSON.parse(usuarioGuardado) as Usuario;
-        const preferencias = usuario.preferencias ?? PREFERENCIAS_INICIALES;
-
-        aplicarTema(preferencias.tema);
-        guardarPreferenciasLocales(preferencias, usuario.id).catch(() => {});
-        activarSesion(true);
-        setUser(usuario);
-
-        // Ya adentro, pedimos la copia buena: si el token venció o la cuenta
-        // cambió, esto lo resuelve sin bloquear el arranque.
-        refrescarSesion();
       } catch (e) {
         console.error("Error restaurando sesión:", e);
         setUser(null);
@@ -165,10 +155,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const usuario = JSON.parse(usuarioGuardado) as Usuario;
       aplicarTema((usuario.preferencias ?? PREFERENCIAS_INICIALES).tema);
       activarSesion(true);
+      setModoInvitado(false);
       setUser(usuario);
       refrescarSesion();
     }
     return resultado;
+  };
+
+  // "Explorar como Invitado": las pestañas se abren sin cuenta. Es solo de esta
+  // sesión de la app; al cerrarla, vuelve a pedir el login.
+  const entrarComoInvitado = () => {
+    setModoInvitado(true);
   };
 
   // Lo usan las pantallas que cambian datos de la cuenta (preferencias, perfil).
@@ -178,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const logout = async () => {
     await cerrarSesionLocal();
-    router.push("/(auth)/login");
+    router.replace("/(auth)/login");
   };
 
   useEffect(() => {
@@ -200,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           cerrando = true;
           try {
             await cerrarSesionLocal();
-            router.push("/(auth)/login");
+            router.replace("/(auth)/login");
           } finally {
             cerrando = false;
           }
@@ -222,8 +219,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         isLoading,
         haySesionGuardada,
+        modoInvitado,
         login,
         register,
+        entrarComoInvitado,
         entrarConBiometria,
         actualizarUsuario,
         logout,

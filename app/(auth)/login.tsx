@@ -16,7 +16,8 @@ import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, entrarConBiometria, haySesionGuardada } = useAuth();
+  const { login, entrarConBiometria, haySesionGuardada, entrarComoInvitado } =
+    useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,6 +67,7 @@ export default function LoginScreen() {
   };
 
   const handleGuestLogin = () => {
+    entrarComoInvitado();
     router.replace("/(tabs)");
   };
 
