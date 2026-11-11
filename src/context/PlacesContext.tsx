@@ -1,13 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { obtenerCategorias } from '../servicios/categories';
 import { cargarCatalogo, refrescarCatalogo } from '../servicios/catalogo';
 import { obtenerEventos } from '../servicios/events';
 import { agregarFavorito, obtenerFavoritos, quitarFavorito } from '../servicios/favoritos';
-import { obtenerVisitasDeLaCuenta } from '../servicios/visitas';
+import {
+  obtenerVisitasDeLaCuenta,
+  sincronizarVisitasPendientes,
+} from '../servicios/visitas';
 import {
   actualizarVisita,
   eliminarVisitaDeDb,
@@ -15,6 +19,7 @@ import {
   eliminarVisitasDeLugar,
   guardarSnapshotVisita,
   guardarVisita,
+  guardarVisitaDelServidor,
   inicializarVisitasDb,
   listarVisitas,
   migrarVisitasLegado,
@@ -205,6 +210,20 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
+  /**
+   * Sube la cola de visitas en segundo plano. Si subió alguna, relee la lista
+   * para que la pantalla muestre el estado real.
+   */
+  const empujarVisitas = (id: string): void => {
+    if (!id || id === 'local') return;
+
+    sincronizarVisitasPendientes(id)
+      .then(async (subidas) => {
+        if (subidas > 0) setVisitas(await listarVisitas(id));
+      })
+      .catch((e) => console.warn('No se pudo subir la cola de visitas', e));
+  };
+
   // PRD §4/§7: cargar la cola local de visitas del usuario actual.
   const recargarVisitas = async (): Promise<void> => {
     try {
@@ -218,6 +237,9 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const lista = await listarVisitas(usuarioId);
       setVisitas(lista);
+
+      // Lo que quedó sin subir (sin señal o de cuando era invitado) se manda ahora.
+      empujarVisitas(usuarioId);
     } catch (e) {
       console.warn('Error al leer las visitas guardadas', e);
     }
@@ -275,11 +297,19 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.warn('No se pudieron pasar los favoritos de invitado', e);
         }
 
+        let delServidor: string[] | null = null;
         try {
-          const delServidor = await obtenerFavoritos();
+          delServidor = await obtenerFavoritos();
           unidos = Array.from(new Set([...unidos, ...delServidor]));
         } catch (e) {
           console.warn('No se pudieron bajar los favoritos de la cuenta', e);
+        }
+
+        // Lo marcado como invitado (o lo que quedó solo en este teléfono) viaja
+        // a la cuenta: si no, se pierde al cambiar de teléfono (PRD §5).
+        if (delServidor) {
+          const faltan = unidos.filter((id) => !delServidor!.includes(id));
+          await Promise.allSettled(faltan.map((id) => agregarFavorito(id)));
         }
       }
 
@@ -310,7 +340,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const lugares = new Map(rawPlaces.map((p) => [p.id, p]));
         for (const visita of delServidor) {
-          await guardarVisita(visita);
+          await guardarVisitaDelServidor(visita);
           const lugar = lugares.get(visita.lugarId);
           if (lugar) {
             await guardarSnapshotVisita(
@@ -333,6 +363,18 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // El catálogo ya está cargado cuando el usuario inicia sesión.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // PRD §7: cuando vuelve la señal, se sube lo que quedó en la cola.
+  useEffect(() => {
+    if (usuarioId === 'local') return;
+
+    const suscripcion = Network.addNetworkStateListener((estado) => {
+      if (estado.isConnected) empujarVisitas(usuarioId);
+    });
+
+    return () => suscripcion.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioId]);
 
   // Visitas más recientes primero. `visitedPlaces` y `visitPhotos` se derivan
   // de acá para que las pantallas viejas sigan funcionando igual.
@@ -399,14 +441,21 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.warn('No se pudo guardar la visita en SQLite', e);
     }
 
+    // Con sesión se sube sola; si no hay señal queda en la cola.
+    empujarVisitas(usuarioId);
+
     return visita;
   };
 
   const actualizarNotaVisita = async (visitaId: string, nota: string): Promise<void> => {
     const limpia = nota.trim() ? nota.trim() : null;
-    setVisitas((prev) => prev.map((v) => (v.id === visitaId ? { ...v, nota: limpia } : v)));
+    // Queda pendiente hasta que la API confirme el cambio.
+    setVisitas((prev) =>
+      prev.map((v) => (v.id === visitaId ? { ...v, nota: limpia, sincronizada: false } : v))
+    );
     try {
-      await actualizarVisita(visitaId, { nota: limpia });
+      await actualizarVisita(visitaId, { nota: limpia, sincronizada: false });
+      empujarVisitas(usuarioId);
     } catch (e) {
       console.warn('No se pudo actualizar la nota de la visita', e);
     }
@@ -499,9 +548,12 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const visita = visitasOrdenadas.find((v) => v.lugarId === placeId);
       if (visita) {
         setVisitas((prev) =>
-          prev.map((v) => (v.id === visita.id ? { ...v, fotoUri: destino } : v))
+          prev.map((v) =>
+            v.id === visita.id ? { ...v, fotoUri: destino, sincronizada: false } : v
+          )
         );
-        await actualizarVisita(visita.id, { fotoUri: destino });
+        await actualizarVisita(visita.id, { fotoUri: destino, sincronizada: false });
+        empujarVisitas(usuarioId);
       } else {
         await registrarVisita(placeId, { origen: 'manual', fotoUri: destino });
       }

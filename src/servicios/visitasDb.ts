@@ -8,6 +8,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SQLite from 'expo-sqlite';
 import { OrigenVisita, Visita } from '../tipos';
+import { esArchivoLocal } from './archivos';
 
 interface VisitaRow {
   id: string;
@@ -112,6 +113,19 @@ export async function listarVisitas(usuarioId: string): Promise<Visita[]> {
   return filas.map(filaAVisita);
 }
 
+/** Visitas de la cuenta que todavía no llegaron al servidor (cola del PRD §7). */
+export async function listarVisitasSinSincronizar(usuarioId: string): Promise<Visita[]> {
+  await inicializarVisitasDb();
+  const db = await abrirBase();
+  const filas = await db.getAllAsync<VisitaRow>(
+    `SELECT * FROM visitas
+     WHERE usuario_id = ? AND sincronizada = 0
+     ORDER BY fecha_hora ASC;`,
+    [usuarioId]
+  );
+  return filas.map(filaAVisita);
+}
+
 export async function listarVisitasDeLugar(
   lugarId: string,
   usuarioId: string
@@ -148,6 +162,25 @@ export async function guardarVisita(visita: Visita): Promise<void> {
       visita.lugarImagen ?? null,
     ]
   );
+}
+
+/**
+ * Copia una visita que vino del servidor sin pisar la foto que ya está en el
+ * teléfono: esa se usa para ver el recorrido sin señal.
+ */
+export async function guardarVisitaDelServidor(visita: Visita): Promise<void> {
+  await inicializarVisitasDb();
+  const db = await abrirBase();
+  const local = await db.getFirstAsync<{ foto_uri: string | null }>(
+    'SELECT foto_uri FROM visitas WHERE id = ?;',
+    [visita.id]
+  );
+
+  await guardarVisita({
+    ...visita,
+    fotoUri: esArchivoLocal(local?.foto_uri) ? local?.foto_uri ?? null : visita.fotoUri,
+    sincronizada: true,
+  });
 }
 
 export interface CambiosVisita {

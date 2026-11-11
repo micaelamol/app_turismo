@@ -80,6 +80,17 @@ export function useAgendaEventos() {
               await guardarEventoEnDb(evento, null, usuarioId);
             }
           }
+
+          // Lo guardado sin cuenta (o sin señal) viaja a la cuenta, para que no
+          // se pierda al cambiar de teléfono (PRD §5).
+          const enServidor = new Set(delServidor.map((evento) => evento.id));
+          for (const evento of locales) {
+            if (!enServidor.has(evento.id)) {
+              guardarEventoEnServidor(evento.id).catch((error) =>
+                console.warn('No se pudo subir el evento guardado', error)
+              );
+            }
+          }
         }
 
         if (vivo) await recargar();
