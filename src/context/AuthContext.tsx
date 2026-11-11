@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { RespuestaIngreso, User, UserRole } from "../types";
 import { httpClient } from "../servicios/client";
+import { pedirBiometria, ResultadoBiometria } from "../servicios/biometria";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 
@@ -9,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (nombre: string, email: string, contrasena: string) => Promise<void>;
+  entrarConBiometria: () => Promise<ResultadoBiometria>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => void;
 }
@@ -31,6 +33,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         ]);
 
         if (!token || !usuarioGuardado) {
+          setUser(null);
+          return;
+        }
+
+        // Si el teléfono tiene huella o rostro configurado, la sesión se abre
+        // con eso. Si el usuario cancela, no lo dejamos adentro: vuelve al
+        // login, donde puede reintentar o escribir la contraseña.
+        const resultado = await pedirBiometria("Entrá a Colón Turismo");
+        if (resultado === "cancelada" || resultado === "fallida") {
           setUser(null);
           return;
         }
@@ -88,6 +99,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Reingreso con huella o rostro sobre la sesión que ya está guardada.
+  const entrarConBiometria = async (): Promise<ResultadoBiometria> => {
+    const [token, usuarioGuardado] = await Promise.all([
+      SecureStore.getItemAsync("user_token"),
+      SecureStore.getItemAsync("user_data"),
+    ]);
+
+    if (!token || !usuarioGuardado) return "sin-sesion";
+
+    const resultado = await pedirBiometria("Entrá a Colón Turismo");
+    if (resultado === "ok") {
+      setUser(JSON.parse(usuarioGuardado) as User);
+    }
+    return resultado;
+  };
+
   const logout = async () => {
     await Promise.all([
       SecureStore.deleteItemAsync("user_token"),
@@ -125,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, logout, switchRole }}
+      value={{ user, isLoading, login, register, entrarConBiometria, logout, switchRole }}
     >
       {children}
     </AuthContext.Provider>

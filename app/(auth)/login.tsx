@@ -16,7 +16,7 @@ import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, entrarConBiometria } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,6 +70,31 @@ export default function LoginScreen() {
 
   const handleGuestLogin = () => {
     router.replace("/(tabs)");
+  };
+
+  // Reingreso rápido: no pide la contraseña, usa la sesión guardada y la
+  // desbloquea con la huella o el rostro del teléfono.
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    try {
+      const resultado = await entrarConBiometria();
+
+      if (resultado === "ok") {
+        router.replace("/(tabs)");
+        return;
+      }
+
+      const mensajes = {
+        "sin-sesion": "Primero ingresá una vez con tu correo y contraseña.",
+        "no-disponible": "Este teléfono no tiene huella o rostro configurado.",
+        cancelada: "Cancelaste la verificación.",
+        fallida: "No pudimos verificar tu identidad. Probá de nuevo.",
+      } as const;
+
+      Alert.alert("Acceso con huella", mensajes[resultado]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -188,12 +213,9 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.biometricButton}
-            onPress={() =>
-              Alert.alert(
-                "Acceso Biométrico",
-                "Iniciando reconocimiento de huella o rostro con SecureStore...",
-              )
-            }
+            onPress={handleBiometricLogin}
+            disabled={loading}
+            accessibilityLabel="Entrar con huella o rostro"
           >
             <Ionicons name="finger-print" size={24} color="#4F46E5" />
           </TouchableOpacity>
