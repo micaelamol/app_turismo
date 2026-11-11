@@ -2,6 +2,7 @@
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import { StatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
@@ -263,6 +264,8 @@ export default function EscanerVisita({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={close}>
       <View style={styles.flex}>
+        {/* La cámara ocupa todo y es negra: acá los íconos van en claro. */}
+        <StatusBar style="light" />
         {visible && renderContent()}
         <TouchableOpacity style={styles.closeBtn} onPress={close}>
           <Ionicons name="close" size={24} color="#fff" />

@@ -1,6 +1,7 @@
 // app/_layout.tsx
 import React from 'react';
 import { Slot } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, LogBox, StyleSheet, Text, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { PlacesProvider } from '../src/context/PlacesContext';
@@ -32,6 +33,7 @@ function Arranque() {
   if (isLoading) {
     return (
       <View style={styles.splash}>
+        <StatusBar style="dark" />
         <Text style={styles.splashTitulo}>Colón</Text>
         <Text style={styles.splashBajada}>Guía Turística & Cultural</Text>
         <ActivityIndicator size="large" color="#4F46E5" style={styles.splashSpinner} />
@@ -39,8 +41,15 @@ function Arranque() {
     );
   }
 
-  // Slot deja pasar a las rutas hijas ((tabs), (auth), place/[id])
-  return <Slot />;
+  // Slot deja pasar a las rutas hijas ((tabs), (auth), place/[id]).
+  // Las pantallas tienen fondo claro, así que la hora y la batería van en
+  // oscuro aunque el teléfono esté en modo noche: si no, no se leen.
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Slot />
+    </>
+  );
 }
 
 export default function RootLayout() {
