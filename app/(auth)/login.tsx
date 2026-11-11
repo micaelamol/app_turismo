@@ -54,8 +54,15 @@ export default function LoginScreen() {
       setLoading(true);
       await login(emailLimpio, password);
       router.replace("/(tabs)");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo iniciar sesión. Revisa tus datos.");
+    } catch (error: any) {
+      // Si la API contestó, mostramos su mensaje; si no, el problema es de red.
+      const mensajeApi = error?.response?.data?.error?.mensaje;
+      const mensaje = mensajeApi
+        ? mensajeApi
+        : error?.code === "ECONNABORTED"
+          ? "La API tardó demasiado en responder."
+          : "No pudimos conectar con la API. Revisá que esté encendida y en la misma red wifi.";
+      Alert.alert("No se pudo ingresar", mensaje);
     } finally {
       setLoading(false);
     }
@@ -84,7 +91,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[
               styles.roleButton,
-              selectedRole === "admin" && styles.roleButtonActive,
+              selectedRole === "turista" && styles.roleButtonActive,
             ]}
             onPress={() => setSelectedRole("turista")}
           >
@@ -106,19 +113,19 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[
               styles.roleButton,
-              selectedRole === "turista" && styles.roleButtonActive,
+              selectedRole === "admin" && styles.roleButtonActive,
             ]}
-            onPress={() => setSelectedRole("turista")}
+            onPress={() => setSelectedRole("admin")}
           >
             <Ionicons
               name="home-outline"
               size={20}
-              color={selectedRole === "turista" ? "#fff" : "#6B7280"}
+              color={selectedRole === "admin" ? "#fff" : "#6B7280"}
             />
             <Text
               style={[
                 styles.roleButtonText,
-                selectedRole === "turista" && styles.roleButtonTextActive,
+                selectedRole === "admin" && styles.roleButtonTextActive,
               ]}
             >
               Colonense

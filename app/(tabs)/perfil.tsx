@@ -80,7 +80,7 @@ export default function ProfileScreen() {
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user?.name || 'Explorador'}</Text>
+            <Text style={styles.userName}>{user?.nombre || 'Explorador'}</Text>
             <Text style={styles.userEmail}>{user?.email || 'turista@miciudad.com'}</Text>
             <View style={styles.roleTag}>
               <Text style={styles.roleTagText}>

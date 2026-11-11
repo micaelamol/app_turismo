@@ -181,7 +181,7 @@ export default function HomeScreen() {
 
             <View style={styles.heroTexts}>
               <Text style={styles.heroGreeting}>
-                ¡Hola, {user?.name?.split(' ')[0] || 'Explorador'}!
+                ¡Hola, {user?.nombre?.split(' ')[0] || 'Explorador'}!
               </Text>
               <Text style={styles.heroTitle}>Perla del Río Uruguay</Text>
               <Text style={styles.heroSubtitle}>
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
 
 //             <View style={styles.heroTexts}>
 //               <Text style={styles.heroGreeting}>
-//                 ¡Hola, {user?.name?.split(' ')[0] || 'Explorador'}!
+//                 ¡Hola, {user?.nombre?.split(' ')[0] || 'Explorador'}!
 //               </Text>
 //               <Text style={styles.heroTitle}>Perla del Río Uruguay</Text>
 //               <Text style={styles.heroSubtitle}>
