@@ -8,6 +8,7 @@ import {
 } from '../tipos';
 
 
+
 export interface FiltrosLugares {
   categoriaId?: string;
   busqueda?: string;
