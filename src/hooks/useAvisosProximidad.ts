@@ -23,6 +23,11 @@ import { distanciaMetros } from '../utils/geo';
 // Cada cuánto se vuelve a mirar la posición y cuánto hay que moverse.
 const INTERVALO_MS = 30_000;
 const DISTANCIA_MINIMA_METROS = 50;
+// Si el GPS da un error más grande que esto, mejor no avisar: podría decir
+// "estás a 20 m" cuando en realidad estás a kilómetros.
+const PRECISION_MAXIMA_METROS = 150;
+// La última posición guardada sirve solo si es reciente. Si no, se espera al GPS.
+const EDAD_MAXIMA_ULTIMA_POSICION_MS = 2 * 60 * 1000;
 
 function aCoordenadas(coords: { latitude: number; longitude: number }): Coordinates {
   return {
@@ -54,6 +59,7 @@ export function useAvisosProximidad(): void {
   preferenciasRef.current = preferencias;
 
   const ultimaPosicionRef = useRef<Coordinates | null>(null);
+  const ultimaPrecisionRef = useRef<number | null>(null);
   const avisosEnCursoRef = useRef<Set<string>>(new Set());
 
   const hayAcceso = Boolean(user) || modoInvitado;
@@ -96,32 +102,38 @@ export function useAvisosProximidad(): void {
 
   // Un aviso por vez: se prueba del lugar más cercano al más lejano y se corta
   // cuando alguno se muestra. Si no, una caminata corta dispara varios juntos.
-  const evaluarPosicion = useCallback(async (coords: Coordinates) => {
-    const prefs = preferenciasRef.current;
-    if (!prefs.avisarProximidad) return;
+  const evaluarPosicion = useCallback(
+    async (coords: Coordinates, precisionMetros?: number | null) => {
+      const prefs = preferenciasRef.current;
+      if (!prefs.avisarProximidad) return;
 
-    const radio = prefs.radioAvisoMetros || 250;
-    const lugares = lugaresRef.current;
-    if (!lugares.length) return;
+      // Una posición muy imprecisa no sirve para decir "estás cerca".
+      if (precisionMetros != null && precisionMetros > PRECISION_MAXIMA_METROS) return;
 
-    const candidatos = lugares
-      .filter((lugar) => lugar.activo !== false)
-      .map((lugar) => ({ lugar, metros: distanciaMetros(coords, lugar.coordinates) }))
-      .filter(({ metros }) => metros <= radio)
-      .sort((a, b) => a.metros - b.metros);
+      const radio = prefs.radioAvisoMetros || 250;
+      const lugares = lugaresRef.current;
+      if (!lugares.length) return;
 
-    for (const { lugar, metros } of candidatos) {
-      if (avisosEnCursoRef.current.has(lugar.id)) continue;
+      const candidatos = lugares
+        .filter((lugar) => lugar.activo !== false)
+        .map((lugar) => ({ lugar, metros: distanciaMetros(coords, lugar.coordinates) }))
+        .filter(({ metros }) => metros <= radio)
+        .sort((a, b) => a.metros - b.metros);
 
-      avisosEnCursoRef.current.add(lugar.id);
-      try {
-        const resultado = await avisarSiEstoyCerca(lugar, metros, usuarioRef.current);
-        if (resultado.enviado) return;
-      } finally {
-        avisosEnCursoRef.current.delete(lugar.id);
+      for (const { lugar, metros } of candidatos) {
+        if (avisosEnCursoRef.current.has(lugar.id)) continue;
+
+        avisosEnCursoRef.current.add(lugar.id);
+        try {
+          const resultado = await avisarSiEstoyCerca(lugar, metros, usuarioRef.current);
+          if (resultado.enviado) return;
+        } finally {
+          avisosEnCursoRef.current.delete(lugar.id);
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Se escucha la ubicación solo si el permiso ya está dado: la app no lo pide
   // al abrir. Si la persona lo niega, todo lo demás sigue funcionando igual.
@@ -140,12 +152,16 @@ export function useAvisosProximidad(): void {
         const puedeAvisar = await asegurarPermisoAvisos();
         if (!puedeAvisar || !vivo) return;
 
-        const ultima = await Location.getLastKnownPositionAsync();
+        const ultima = await Location.getLastKnownPositionAsync({
+          maxAge: EDAD_MAXIMA_ULTIMA_POSICION_MS,
+          requiredAccuracy: PRECISION_MAXIMA_METROS,
+        });
         if (ultima && vivo) {
           const coords = aCoordenadas(ultima.coords);
           ultimaPosicionRef.current = coords;
+          ultimaPrecisionRef.current = ultima.coords.accuracy;
           setUserLocation(coords);
-          evaluarPosicion(coords);
+          evaluarPosicion(coords, ultima.coords.accuracy);
         }
 
         suscripcion = await Location.watchPositionAsync(
@@ -157,8 +173,9 @@ export function useAvisosProximidad(): void {
           (posicion) => {
             const coords = aCoordenadas(posicion.coords);
             ultimaPosicionRef.current = coords;
+            ultimaPrecisionRef.current = posicion.coords.accuracy;
             setUserLocation(coords);
-            evaluarPosicion(coords);
+            evaluarPosicion(coords, posicion.coords.accuracy);
           }
         );
       } catch (error) {
@@ -184,7 +201,7 @@ export function useAvisosProximidad(): void {
   useEffect(() => {
     if (!preferenciasListas || !preferencias.avisarProximidad) return;
     if (!ultimaPosicionRef.current) return;
-    evaluarPosicion(ultimaPosicionRef.current);
+    evaluarPosicion(ultimaPosicionRef.current, ultimaPrecisionRef.current);
   }, [places, preferenciasListas, preferencias.avisarProximidad, evaluarPosicion]);
 
   // Tocar el aviso abre el detalle del lugar.
