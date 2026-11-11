@@ -6,6 +6,8 @@ import { useAuth } from './AuthContext';
 import { obtenerCategorias } from '../servicios/categories';
 import { cargarCatalogo, refrescarCatalogo } from '../servicios/catalogo';
 import { obtenerEventos } from '../servicios/events';
+import { agregarFavorito, obtenerFavoritos, quitarFavorito } from '../servicios/favoritos';
+import { obtenerVisitasDeLaCuenta } from '../servicios/visitas';
 import {
   actualizarVisita,
   eliminarVisitaDeDb,
@@ -230,6 +232,71 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     })();
   }, []);
+
+  // PRD §5: los favoritos de la cuenta viven en el servidor. Al entrar se suman
+  // a los que ya había en el teléfono, así no se pierde nada de lo marcado
+  // antes de iniciar sesión.
+  useEffect(() => {
+    if (!user) return;
+    let vivo = true;
+
+    (async () => {
+      try {
+        const delServidor = await obtenerFavoritos();
+        if (!vivo) return;
+
+        setFavorites((prev) => {
+          const unidos = Array.from(new Set([...prev, ...delServidor]));
+          AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(unidos)).catch(() => {});
+          return unidos;
+        });
+      } catch (e) {
+        console.warn('No se pudieron bajar los favoritos de la cuenta', e);
+      }
+    })();
+
+    return () => {
+      vivo = false;
+    };
+  }, [user?.id]);
+
+  // PRD §4: las visitas de la cuenta también viven en el servidor. Al entrar se
+  // bajan y se copian a recorrido_offline.db, así el recorrido arranca con datos
+  // aunque después se corte la señal.
+  useEffect(() => {
+    if (!user) return;
+    let vivo = true;
+
+    (async () => {
+      try {
+        const delServidor = await obtenerVisitasDeLaCuenta();
+        if (!vivo) return;
+
+        const lugares = new Map(rawPlaces.map((p) => [p.id, p]));
+        for (const visita of delServidor) {
+          await guardarVisita(visita);
+          const lugar = lugares.get(visita.lugarId);
+          if (lugar) {
+            await guardarSnapshotVisita(
+              visita.id,
+              lugar.nombre || lugar.title || '',
+              lugar.imageUrl || lugar.imagenes?.[0] || null
+            );
+          }
+        }
+
+        if (vivo) await recargarVisitas();
+      } catch (e) {
+        console.warn('No se pudieron bajar las visitas de la cuenta', e);
+      }
+    })();
+
+    return () => {
+      vivo = false;
+    };
+    // El catálogo ya está cargado cuando el usuario inicia sesión.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Visitas más recientes primero. `visitedPlaces` y `visitPhotos` se derivan
   // de acá para que las pantallas viejas sigan funcionando igual.
@@ -566,18 +633,23 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleFavorite = (placeId: string) => {
-    setFavorites((prev) => {
-      const siguiente = prev.includes(placeId)
-        ? prev.filter((id) => id !== placeId)
-        : [...prev, placeId];
+    const yaEstaba = favorites.includes(placeId);
+    const siguiente = yaEstaba
+      ? favorites.filter((id) => id !== placeId)
+      : [...favorites, placeId];
 
-      // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3).
-      AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(siguiente)).catch((e) =>
-        console.warn('No se pudieron guardar los favoritos', e)
-      );
+    setFavorites(siguiente);
 
-      return siguiente;
-    });
+    // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3).
+    AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(siguiente)).catch((e) =>
+      console.warn('No se pudieron guardar los favoritos', e)
+    );
+
+    // Con sesión, el servidor también se entera (PRD §5).
+    if (user) {
+      const pedido = yaEstaba ? quitarFavorito(placeId) : agregarFavorito(placeId);
+      pedido.catch((e) => console.warn('No se pudo sincronizar el favorito', e));
+    }
   };
 
   const isFavorite = (placeId: string): boolean => {

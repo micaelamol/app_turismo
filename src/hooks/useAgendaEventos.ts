@@ -3,7 +3,8 @@
 // y recordatorio local programado con expo-notifications.
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import {
   EventoGuardado,
   eliminarEventoDeDb,
@@ -11,6 +12,11 @@ import {
   inicializarAgendaDb,
   listarEventosGuardados,
 } from '../servicios/agendaDb';
+import {
+  guardarEventoEnServidor,
+  obtenerEventosGuardadosDeLaCuenta,
+  quitarEventoDelServidor,
+} from '../servicios/eventosGuardados';
 import { cancelarRecordatorio, programarRecordatorioEvento } from '../servicios/notificaciones';
 import { CityEvent } from '../tipos';
 import { eventoYaPaso } from '../utils/eventos';
@@ -48,6 +54,39 @@ export function useAgendaEventos() {
     }, [recargar])
   );
 
+  const { user } = useAuth();
+
+  // PRD §3: los eventos guardados de la cuenta están en el servidor. Al entrar
+  // se bajan y se suman a los que ya había en el teléfono.
+  useEffect(() => {
+    if (!user) return;
+    let vivo = true;
+
+    (async () => {
+      try {
+        const delServidor = await obtenerEventosGuardadosDeLaCuenta();
+        if (!vivo) return;
+
+        const locales = await listarEventosGuardados();
+        const yaEstaban = new Set(locales.map((evento) => evento.id));
+
+        for (const evento of delServidor) {
+          if (!yaEstaban.has(evento.id)) {
+            await guardarEventoEnDb(evento, null);
+          }
+        }
+
+        if (vivo) await recargar();
+      } catch (error) {
+        console.warn('No se pudieron bajar los eventos guardados', error);
+      }
+    })();
+
+    return () => {
+      vivo = false;
+    };
+  }, [user?.id, recargar]);
+
   const estaGuardado = useCallback(
     (eventoId: string) => eventosGuardados.some((evento) => evento.id === eventoId),
     [eventosGuardados]
@@ -73,9 +112,25 @@ export function useAgendaEventos() {
         };
       }
 
+      // R17 del back: solo se guardan eventos programados o suspendidos.
+      if (evento.estado === 'cancelado') {
+        return {
+          guardado: false,
+          mensaje: 'Este evento está cancelado, así que no se puede agregar a tu agenda.',
+        };
+      }
+
       try {
         const recordatorio = await programarRecordatorioEvento(evento);
         await guardarEventoEnDb(evento, recordatorio.notificacionId ?? null);
+
+        // Con sesión, el evento también queda guardado en la cuenta.
+        if (user) {
+          guardarEventoEnServidor(evento.id).catch((error) =>
+            console.warn('No se pudo guardar el evento en el servidor', error)
+          );
+        }
+
         await recargar();
 
         return {
@@ -91,7 +146,7 @@ export function useAgendaEventos() {
         };
       }
     },
-    [eventosGuardados, recargar]
+    [eventosGuardados, recargar, user]
   );
 
   const quitarEvento = useCallback(
@@ -101,6 +156,14 @@ export function useAgendaEventos() {
       try {
         await cancelarRecordatorio(guardado?.notificacionId ?? null);
         await eliminarEventoDeDb(eventoId);
+
+        // Con sesión, también se quita de la cuenta.
+        if (user) {
+          quitarEventoDelServidor(eventoId).catch((error) =>
+            console.warn('No se pudo quitar el evento del servidor', error)
+          );
+        }
+
         await recargar();
         return { guardado: false, mensaje: 'Quitamos el evento de tu agenda.' };
       } catch (error) {
@@ -111,7 +174,7 @@ export function useAgendaEventos() {
         };
       }
     },
-    [eventosGuardados, recargar]
+    [eventosGuardados, recargar, user]
   );
 
   return {
