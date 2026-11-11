@@ -3,6 +3,7 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   StyleSheet,
@@ -25,6 +26,13 @@ export default function ProfileScreen() {
   const visitedPlacesList = places.filter((p: Place) => visitedPlaces.includes(p.id));
 
   const currentList = activeTab === 'favorites' ? favoritePlaces : visitedPlacesList;
+
+  const confirmarSalida = () => {
+    Alert.alert('Cerrar sesión', '¿Querés salir de tu cuenta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => { logout(); } },
+    ]);
+  };
 
   const renderItem = ({ item }: { item: Place }) => (
     <TouchableOpacity
@@ -87,7 +95,7 @@ export default function ProfileScreen() {
           {user ? (
             <TouchableOpacity
               style={styles.logoutBtn}
-              onPress={logout}
+              onPress={confirmarSalida}
               accessibilityLabel="Cerrar sesión"
             >
               <Ionicons name="log-out-outline" size={22} color="#EF4444" />

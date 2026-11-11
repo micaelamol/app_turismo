@@ -16,7 +16,7 @@ import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, entrarConBiometria } = useAuth();
+  const { login, entrarConBiometria, haySesionGuardada } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -161,14 +161,17 @@ export default function LoginScreen() {
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.biometricButton}
-            onPress={handleBiometricLogin}
-            disabled={loading}
-            accessibilityLabel="Entrar con huella o rostro"
-          >
-            <Ionicons name="finger-print" size={24} color="#4F46E5" />
-          </TouchableOpacity>
+          {/* Solo si hay una sesión guardada que desbloquear. */}
+          {haySesionGuardada && (
+            <TouchableOpacity
+              style={styles.biometricButton}
+              onPress={handleBiometricLogin}
+              disabled={loading}
+              accessibilityLabel="Entrar con huella o rostro"
+            >
+              <Ionicons name="finger-print" size={24} color="#4F46E5" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity

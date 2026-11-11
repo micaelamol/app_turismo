@@ -1,8 +1,8 @@
 // app/_layout.tsx
 import React from 'react';
 import { Slot } from 'expo-router';
-import { LogBox } from 'react-native';
-import { AuthProvider } from '../src/context/AuthContext';
+import { ActivityIndicator, LogBox, StyleSheet, Text, View } from 'react-native';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { PlacesProvider } from '../src/context/PlacesContext';
 import { inicializarBaseDeDatos } from '../src/servicios/database';
 
@@ -22,13 +22,45 @@ try {
   console.error('Error al inicializar SQLite:', err);
 }
 
+/**
+ * Mientras se restaura la sesión guardada no mostramos las pestañas: si no,
+ * se ve "Invitado" un instante antes de que aparezca la cuenta.
+ */
+function Arranque() {
+  const { isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.splash}>
+        <Text style={styles.splashTitulo}>Colón</Text>
+        <Text style={styles.splashBajada}>Guía Turística & Cultural</Text>
+        <ActivityIndicator size="large" color="#4F46E5" style={styles.splashSpinner} />
+      </View>
+    );
+  }
+
+  // Slot deja pasar a las rutas hijas ((tabs), (auth), place/[id])
+  return <Slot />;
+}
+
 export default function RootLayout() {
   return (
     <AuthProvider>
       <PlacesProvider>
-        {/* Slot deja pasar a las rutas hijas ((tabs), (auth), place/[id]) */}
-        <Slot />
+        <Arranque />
       </PlacesProvider>
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  splashTitulo: { fontSize: 34, fontWeight: 'bold', color: '#1F2937' },
+  splashBajada: { fontSize: 14, color: '#6B7280', marginTop: 4 },
+  splashSpinner: { marginTop: 24 },
+});
