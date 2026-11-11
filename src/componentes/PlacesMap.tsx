@@ -2,7 +2,9 @@ import * as Location from 'expo-location';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
+import { usePlaces } from '../context/PlacesContext';
 import { Place } from '../types';
+import { distanciaMetros, formatearDistancia } from '../utils/geo';
 
 type Props = {
   places: Place[];
@@ -22,6 +24,7 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
+  const { userLocation } = usePlaces();
 
   // Pedir permiso de ubicación
   useEffect(() => {
@@ -74,6 +77,8 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
     >
       {places.map((p) => {
         const isSel = selectedPlace?.id === p.id;
+        // PRD §2: al tocar el marcador se ve el nombre y la distancia.
+        const distancia = formatearDistancia(distanciaMetros(userLocation, p.coordinates));
         return (
           <Marker
             key={p.id}
@@ -82,7 +87,7 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
               longitude: p.coordinates.longitude,
             }}
             title={p.title}
-            description={p.address}
+            description={distancia ? `${distancia} de vos` : p.address}
             pinColor={isSel ? '#4F46E5' : '#EF4444'}
             onPress={() => onSelect(p)}
           />

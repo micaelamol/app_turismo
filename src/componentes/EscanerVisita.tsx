@@ -1,6 +1,7 @@
 // src/componentes/EscanerVisita.tsx
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
@@ -77,6 +78,28 @@ export default function EscanerVisita({
       if (photo?.uri) setPhotoUri(photo.uri);
     } catch (e) {
       Alert.alert('Error', 'No se pudo sacar la foto.');
+    }
+  };
+
+  // PRD, tabla técnica: "Galería: elegir una foto ya sacada en vez de sacar una nueva".
+  const pickPhoto = async () => {
+    try {
+      const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permiso.granted) {
+        Alert.alert('Sin permiso', 'Para elegir una foto necesitamos entrar a tus imágenes.');
+        return;
+      }
+
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+      });
+
+      if (!resultado.canceled && resultado.assets?.[0]?.uri) {
+        setPhotoUri(resultado.assets[0].uri);
+      }
+    } catch {
+      Alert.alert('Error', 'No se pudo abrir la galería.');
     }
   };
 
@@ -204,6 +227,10 @@ export default function EscanerVisita({
                     <Text style={styles.secondaryText}>Simular QR</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity style={styles.secondaryBtn} onPress={pickPhoto}>
+                  <Ionicons name="images-outline" size={18} color="#fff" />
+                  <Text style={styles.secondaryText}>Galería</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryBtn} onPress={takePhoto}>
                   <Ionicons name="camera" size={18} color="#fff" />
                   <Text style={styles.primaryText}>Sacar foto</Text>
@@ -216,6 +243,10 @@ export default function EscanerVisita({
               <View style={styles.row}>
                 <TouchableOpacity style={styles.secondaryBtn} onPress={() => finish(false)}>
                   <Text style={styles.secondaryText}>Sin foto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.secondaryBtn} onPress={pickPhoto}>
+                  <Ionicons name="images-outline" size={18} color="#fff" />
+                  <Text style={styles.secondaryText}>Galería</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.primaryBtn} onPress={takePhoto}>
                   <Ionicons name="camera" size={18} color="#fff" />
