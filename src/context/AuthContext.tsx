@@ -12,8 +12,6 @@ import { router } from "expo-router";
 
 interface AuthContextType {
   user: User | null;
-  /** true mientras se restaura la sesión guardada al abrir la app. */
-  isLoading: boolean;
   /** Hay token guardado: se puede ofrecer el reingreso con huella o rostro. */
   haySesionGuardada: boolean;
   /** El usuario eligió "Explorar como Invitado": puede ver las pestañas sin cuenta. */
@@ -32,7 +30,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [haySesionGuardada, setHaySesionGuardada] = useState<boolean>(false);
   const [modoInvitado, setModoInvitado] = useState<boolean>(false);
 
@@ -104,17 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           SecureStore.getItemAsync("user_data"),
         ]);
 
-        if (!token || !usuarioGuardado) {
-          setUser(null);
-          return;
-        }
+        if (!token || !usuarioGuardado) return;
 
         setHaySesionGuardada(true);
       } catch (e) {
         console.error("Error restaurando sesión:", e);
-        setUser(null);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -217,7 +208,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
-        isLoading,
         haySesionGuardada,
         modoInvitado,
         login,

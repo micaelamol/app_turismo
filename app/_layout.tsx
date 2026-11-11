@@ -2,8 +2,8 @@
 import React from 'react';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, LogBox, StyleSheet, Text, View } from 'react-native';
-import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { LogBox } from 'react-native';
+import { AuthProvider } from '../src/context/AuthContext';
 import { PlacesProvider } from '../src/context/PlacesContext';
 import { inicializarBaseDeDatos } from '../src/servicios/database';
 
@@ -24,52 +24,18 @@ try {
 }
 
 /**
- * Mientras se restaura la sesión guardada no mostramos las pestañas: si no,
- * se ve "Invitado" un instante antes de que aparezca la cuenta.
+ * No hay pantalla de arranque propia: la app abre directo en el login (si no
+ * hay cuenta desbloqueada, el layout de las pestañas redirige ahí). Las
+ * pantallas tienen fondo claro, así que la hora y la batería van en oscuro
+ * aunque el teléfono esté en modo noche: si no, no se leen.
  */
-function Arranque() {
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return (
-      <View style={styles.splash}>
-        <StatusBar style="dark" />
-        <Text style={styles.splashTitulo}>Colón</Text>
-        <Text style={styles.splashBajada}>Guía Turística & Cultural</Text>
-        <ActivityIndicator size="large" color="#4F46E5" style={styles.splashSpinner} />
-      </View>
-    );
-  }
-
-  // Slot deja pasar a las rutas hijas ((tabs), (auth), place/[id]).
-  // Las pantallas tienen fondo claro, así que la hora y la batería van en
-  // oscuro aunque el teléfono esté en modo noche: si no, no se leen.
-  return (
-    <>
-      <StatusBar style="dark" />
-      <Slot />
-    </>
-  );
-}
-
 export default function RootLayout() {
   return (
     <AuthProvider>
       <PlacesProvider>
-        <Arranque />
+        <StatusBar style="dark" />
+        <Slot />
       </PlacesProvider>
     </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  splash: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
-  },
-  splashTitulo: { fontSize: 34, fontWeight: 'bold', color: '#1F2937' },
-  splashBajada: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  splashSpinner: { marginTop: 24 },
-});
