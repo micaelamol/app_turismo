@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import type { UserRole } from '../../src/types';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -29,7 +30,8 @@ export default function RegisterScreen() {
       return;
     }
     if (register) {
-      register(name, email, role);
+      // "habitante" todavía no es un rol del back, pero lo guardamos igual en el usuario local
+      register(name, email, role as UserRole);
     }
     // Una vez registrado, lo mandamos directo al inicio de la app
     router.replace('/(tabs)');

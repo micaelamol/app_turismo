@@ -4,7 +4,7 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAuth } from '../../src/context/AuthContext';
 export default function TabsLayout() {
   const {user}=useAuth()
-  const {nombre}=user
+  const nombre = user?.nombre ?? ''
   return (
     <Tabs screenOptions={{
       tabBarActiveTintColor: '#A8422A',
