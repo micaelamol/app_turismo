@@ -22,17 +22,12 @@ import {
   aplicarTema,
   guardarPreferenciasLocales,
   leerPreferenciasLocales,
+  normalizarPreferencias,
   PREFERENCIAS_INICIALES,
 } from '../src/servicios/preferencias';
 import { Preferencias } from '../src/tipos';
 
 const RADIOS: Array<Preferencias['radioAvisoMetros']> = [100, 250, 500];
-
-const TEMAS: Array<{ valor: Preferencias['tema']; etiqueta: string }> = [
-  { valor: 'claro', etiqueta: 'Claro' },
-  { valor: 'oscuro', etiqueta: 'Oscuro' },
-  { valor: 'sistema', etiqueta: 'Sistema' },
-];
 
 export default function PreferenciasScreen() {
   const router = useRouter();
@@ -48,8 +43,9 @@ export default function PreferenciasScreen() {
     let vivo = true;
 
     (async () => {
-      const iniciales =
-        user?.preferencias ?? (await leerPreferenciasLocales(usuarioId));
+      const iniciales = normalizarPreferencias(
+        user?.preferencias ?? (await leerPreferenciasLocales(usuarioId))
+      );
       if (vivo) {
         setPrefs(iniciales);
         aplicarTema(iniciales.tema);
@@ -178,28 +174,6 @@ export default function PreferenciasScreen() {
                 >
                   <Text style={[styles.chipText, activa && styles.chipTextActive]}>
                     {categoria.nombre || categoria.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Tema</Text>
-        <View style={styles.card}>
-          <View style={styles.optionsRow}>
-            {TEMAS.map((tema) => {
-              const activo = prefs.tema === tema.valor;
-              return (
-                <TouchableOpacity
-                  key={tema.valor}
-                  style={[styles.option, activo && styles.optionActive]}
-                  onPress={() => setPrefs((prev) => ({ ...prev, tema: tema.valor }))}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: activo }}
-                >
-                  <Text style={[styles.optionText, activo && styles.optionTextActive]}>
-                    {tema.etiqueta}
                   </Text>
                 </TouchableOpacity>
               );

@@ -25,10 +25,20 @@ export async function leerPreferenciasLocales(usuarioId = 'local'): Promise<Pref
   try {
     const guardadas = await Storage.getItem(claveDe(usuarioId));
     if (!guardadas) return PREFERENCIAS_INICIALES;
-    return { ...PREFERENCIAS_INICIALES, ...JSON.parse(guardadas) };
+    return normalizarPreferencias({ ...PREFERENCIAS_INICIALES, ...JSON.parse(guardadas) });
   } catch {
     return PREFERENCIAS_INICIALES;
   }
+}
+
+/**
+ * La app tiene un solo diseño, claro. Si una cuenta vieja quedó con `oscuro`,
+ * la pasamos a `sistema` para no guardar un valor que la app no puede mostrar.
+ */
+export function normalizarPreferencias(preferencias: Preferencias): Preferencias {
+  return preferencias.tema === 'oscuro'
+    ? { ...preferencias, tema: 'sistema' }
+    : preferencias;
 }
 
 export async function guardarPreferenciasLocales(
@@ -51,11 +61,14 @@ export async function actualizarPreferencias(
   return res.data.datos;
 }
 
-/** El tema elegido se aplica al sistema; "sistema" vuelve a seguir al teléfono. */
-export function aplicarTema(tema: Preferencias['tema']): void {
+/**
+ * Las pantallas están pensadas en claro, así que el teléfono queda en claro
+ * aunque la persona use modo noche. Si no, la barra de estado y los diálogos
+ * se ponen oscuros sobre pantallas blancas y no se leen.
+ */
+export function aplicarTema(_tema: Preferencias['tema']): void {
   try {
-    const esquema = tema === 'oscuro' ? 'dark' : tema === 'claro' ? 'light' : null;
-    Appearance.setColorScheme(esquema);
+    Appearance.setColorScheme('light');
   } catch {
     // En versiones viejas de React Native esto no existe: no pasa nada.
   }
