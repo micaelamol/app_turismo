@@ -7,7 +7,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,6 +18,7 @@ import {
 } from 'react-native';
 import { LugarCercano, PermisoUbicacion } from '../context/PlacesContext';
 import { formatearDistancia } from '../utils/geo';
+import FotoLugar from './FotoLugar';
 
 const LARGO_MAXIMO_NOTA = 140;
 
@@ -137,7 +137,12 @@ export default function RegistroCercania({
               setNota('');
             }}
           >
-            <Image source={{ uri: item.lugar.imageUrl }} style={styles.thumb} />
+            <FotoLugar
+              uri={item.lugar.imageUrl}
+              categoriaId={item.lugar.category}
+              style={styles.thumb}
+              iconSize={22}
+            />
             <View style={styles.itemInfo}>
               <Text style={styles.itemTitulo} numberOfLines={1}>
                 {item.lugar.title}
@@ -174,7 +179,13 @@ export default function RegistroCercania({
             <Text style={styles.volverTexto}>Volver</Text>
           </TouchableOpacity>
 
-          <Image source={{ uri: seleccionado.lugar.imageUrl }} style={styles.notaImagen} />
+          <FotoLugar
+            uri={seleccionado.lugar.imageUrl}
+            categoriaId={seleccionado.lugar.category}
+            style={styles.notaImagen}
+            iconSize={40}
+            mostrarEtiqueta
+          />
 
           <Text style={styles.notaTitulo}>¡Llegaste a {seleccionado.lugar.title}!</Text>
           <Text style={styles.notaSubtitulo}>

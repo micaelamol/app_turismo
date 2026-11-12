@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FotoLugar from '../../src/componentes/FotoLugar';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
@@ -40,7 +41,12 @@ export default function ProfileScreen() {
       activeOpacity={0.85}
       onPress={() => router.push(`/place/${item.id}`)}
     >
-      <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
+      <FotoLugar
+        uri={item.imageUrl}
+        categoriaId={item.category}
+        style={styles.itemImage}
+        iconSize={24}
+      />
       <View style={styles.itemInfo}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
           <Text style={styles.itemCategory}>{item.category.toUpperCase()}</Text>

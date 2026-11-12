@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import FlechaLugar from '../../src/componentes/FlechaLugar';
+import FotoLugar from '../../src/componentes/FotoLugar';
 import ReproductorAudioguia from '../../src/componentes/ReproductorAudioguia';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
@@ -241,7 +242,13 @@ export default function PlaceDetailScreen() {
             onMomentumScrollEnd={handleScroll}
             keyExtractor={(_, index) => `img-${index}`}
             renderItem={({ item }) => (
-              <Image source={{ uri: item }} style={styles.heroImage} resizeMode="cover" />
+              <FotoLugar
+                uri={item}
+                categoriaId={place.categoriaId ?? place.category}
+                style={styles.heroImage}
+                iconSize={54}
+                mostrarEtiqueta
+              />
             )}
           />
 

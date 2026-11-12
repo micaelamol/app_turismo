@@ -671,8 +671,9 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       category: p.categoriaId || p.category || '',
       address: p.direccion || p.address || '',
       description: p.descripcion || p.description || '',
-      // ARREGLO CRÍTICO: Extrae de forma segura el string del array de imágenes
-      imageUrl: p.imageUrl || (p.imagenes && p.imagenes[0]) || 'https://placeholder.com',
+      // Si el lugar no tiene fotos, queda vacío y la pantalla muestra el
+      // reemplazo con el ícono de la categoría (componente FotoLugar).
+      imageUrl: p.imageUrl || (p.imagenes && p.imagenes[0]) || '',
       rating: calcRating,
       ratingCount: calcRatingCount,
       userRating,

@@ -6,7 +6,6 @@ import React from 'react';
 
 import {
   FlatList,
-  Image,
   ImageBackground,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import FotoLugar from '../../src/componentes/FotoLugar';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
@@ -75,7 +75,12 @@ export default function HomeScreen() {
       activeOpacity={0.9}
       onPress={() => goToDetail(item.id)}
     >
-      <Image source={{ uri: item.imageUrl }} style={styles.featuredImage} />
+      <FotoLugar
+        uri={item.imageUrl}
+        categoriaId={item.category}
+        style={styles.featuredImage}
+        iconSize={34}
+      />
       <View style={styles.featuredOverlay} />
       <TouchableOpacity style={styles.favoriteButton} onPress={() => toggleFavorite(item.id)}>
         <Ionicons
@@ -108,7 +113,12 @@ export default function HomeScreen() {
       activeOpacity={0.85}
       onPress={() => goToDetail(item.id)}
     >
-      <Image source={{ uri: item.imageUrl }} style={styles.placeCardImage} />
+      <FotoLugar
+        uri={item.imageUrl}
+        categoriaId={item.category}
+        style={styles.placeCardImage}
+        iconSize={30}
+      />
       <View style={styles.placeCardInfo}>
         <View style={styles.placeCardHeader}>
           <Text style={styles.placeCategoryTag}>{item.category.toUpperCase()}</Text>
