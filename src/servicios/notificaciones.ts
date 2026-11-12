@@ -6,10 +6,13 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { Evento } from '../tipos';
 import { eventoYaPaso } from '../utils/eventos';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const CANAL_AGENDA = 'agenda-eventos';
 const MINUTOS_ANTICIPACION = 60;
 const MINUTOS_ANTICIPACION_MINIMA = 15;
+
+const esExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export type MotivoSinRecordatorio =
   | 'sin_permiso'
@@ -27,15 +30,16 @@ export interface ResultadoRecordatorio {
 }
 
 // Handler global: hace que la notificación se muestre aunque la app esté abierta.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
+if (!esExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 /** Canal obligatorio en Android 8+ para que el aviso tenga importancia y sonido. */
 export async function prepararCanalAgenda(): Promise<void> {
   if (Platform.OS !== 'android') return;

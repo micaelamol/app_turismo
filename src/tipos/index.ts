@@ -199,10 +199,26 @@ export interface DatosIngreso {
 
 export interface RespuestaIngreso {
   datos: DatosIngreso;
-  meta: null;
+  meta: MetaRespuesta | null;
 }
 
 //====================================================
+//respuesta de la ruta url/yo 
+export interface RespuestaYo {
+  datos: Usuario
+  meta: MetaRespuesta | null
+}
+
+
+
+export interface TokenPayload {
+  sub: string;
+  rol: 'turista' | 'admin';
+  iat: number;
+  exp: number;
+}
+
+
 // -------------------------------------------------------------------------
 // Alias de compatibilidad
 // -------------------------------------------------------------------------

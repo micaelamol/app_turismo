@@ -1,14 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { RespuestaIngreso, User, UserRole } from "../types";
+import {
+  RespuestaApiExito,
+  RespuestaIngreso,
+  RespuestaYo,
+  TokenPayload,
+  User,
+  UserRole,
+} from "../types";
 import { httpClient } from "../servicios/client";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
+import { jwtDecode } from "jwt-decode";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, role: UserRole) => Promise<void>;
+  register: (name: string, email: string, contrasena: string) => Promise<void>;
   logout: () => Promise<void>;
   switchRole: (role: UserRole) => void;
 }
@@ -29,21 +37,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // Iniciamos con una sesión de ejemplo amigable
 
         const token = await SecureStore.getItemAsync("user_token");
+        console.log("restaurando sesion: ", token);
         if (!token) {
           setUser(null);
           setIsLoading(false);
 
+          router.replace("/(tabs)/login");
           return;
         }
+        try {
+          const yo = await httpClient.get<RespuestaYo>("/yo");
+          const payload = jwtDecode<TokenPayload>(token);
 
-        /* setUser({
-          id: "u-1",
-          name: "Turista Explorador",
-          email: "turista@miciudad.com",
-          role: "turista",
-          avatar:
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-        }); */
+          yo.data.datos.role = payload.rol;
+          setUser(yo.data.datos);
+          router.replace("/(tabs)");
+        } catch (e) {
+          console.error("Error restaurando sesión:", e);
+        }
       } catch (e) {
         console.error("Error restaurando sesión:", e);
       } finally {
@@ -61,22 +72,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email,
         contrasena,
       });
-      console.log("log: ", res.data);
+      /* console.log("log: ", res.data); */
       const { token, usuario } = res.data.datos;
       setUser(usuario);
+      const payload = jwtDecode<TokenPayload>(token);
+      /* console.log("pyload.rol: ", payload.rol); // "turista" o "admin" */
+      /* console.log("usuario: ", usuario); */
+      usuario.role = payload.rol;
       await SecureStore.setItemAsync("user_token", token);
-
-      /* setUser({
-        id: "u-1",
-        nombre: "prueba",
-        email,
-        avatarUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-      }); */
     } catch (e: any) {
       console.log(e);
       if (e.response) {
-        // Acá NestJS te dice exactamente qué campo no pasó la validación:
+        // detalle del rechazo en el login
         console.log(
           "Detalle del 400:",
           JSON.stringify(e.response.data, null, 2),
@@ -85,39 +92,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     } finally {
       setIsLoading(false);
     }
-
-    /* // Simular inicio de sesión
-    setTimeout(() => {
-      setUser({
-        id: 'u-1',
-        name: role === 'turista' ? 'Turista Explorador' : 'Vecino Local',
-        email,
-        role,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      });
-      setIsLoading(false);
-    }, 500); */
   };
 
-  const register = async (name: string, email: string, role: UserRole) => {
+  const register = async (
+    nombre: string,
+    email: string,
+    contrasena: string,
+  ) => {
     setIsLoading(true);
-    setTimeout(() => {
-      setUser({
-        id: `u-${Date.now()}`,
-        name,
+    try {
+      const nuevoUsuario = await httpClient.post<RespuestaIngreso>("/auth/registro", {
+        nombre,
         email,
-        role,
-        avatar:
-          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
+        contrasena,
       });
-      setIsLoading(false);
-    }, 500);
+      const { token, usuario } = nuevoUsuario.data.datos;
+      await SecureStore.setItemAsync("user_token", token);
+      setUser(usuario)
+      router.replace("/(tabs)/index")
+    } catch (e) {
+      console.log(e);
+
+    }finally{
+      setIsLoading(false)
+    }
+    
   };
 
   const logout = async () => {
     await SecureStore.deleteItemAsync("user_token");
     setUser(null);
-    router.push("/(auth)/login");
+    router.replace("/(auth)/login");
   };
 
   useEffect(() => {

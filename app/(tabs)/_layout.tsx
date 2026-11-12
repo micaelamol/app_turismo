@@ -4,7 +4,7 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useAuth } from '../../src/context/AuthContext';
 export default function TabsLayout() {
   const {user}=useAuth()
-  const {nombre}=user
+  
   return (
     <Tabs screenOptions={{
       tabBarActiveTintColor: '#A8422A',
@@ -16,7 +16,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: `Bienvenido ${nombre}`,
+          title: `Bienvenido ${user?.nombre||""}`,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),

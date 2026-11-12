@@ -1,82 +1,116 @@
 // app/(auth)/register.tsx
-import { Ionicons } from '@react-native-vector-icons/ionicons';
-import React, { useState } from 'react';
+import { Ionicons } from "@react-native-vector-icons/ionicons";
+import React, { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuth } from '../../src/context/AuthContext';
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useAuth } from "../../src/context/AuthContext";
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuth();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'turista' | 'habitante'>('turista');
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"turista" | "habitante">("turista");
 
-  const handleRegister = () => {
-    if (!name || !email) {
-      Alert.alert('Campos incompletos', 'Por favor ingresa tu nombre y correo.');
-      return;
+  const handleRegister = async () => {
+    try {
+      if (!name || !email || !password) {
+        Alert.alert(
+          "Campos incompletos",
+          "Por favor ingresa tu nombre, correo y contraseña.",
+        );
+        return;
+      }
+      if (register) {
+        await register(name.trim(), email.trim(), password);
+      }
+      // Una vez registrado, lo mandamos directo al inicio de la app
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      const mensaje =
+        e.response?.data?.error?.mensaje ||
+        "No se pudo completar el registro. Verificá los datos ingresados.";
+      Alert.alert("Error al registrarse", mensaje);
     }
-    if (register) {
-      register(name, email, role);
-    }
-    // Una vez registrado, lo mandamos directo al inicio de la app
-    router.replace('/(tabs)');
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
 
         <View style={styles.header}>
           <Text style={styles.title}>Crea tu Cuenta</Text>
-          <Text style={styles.subtitle}>Comienza a explorar los mejores rincones de Colón</Text>
+          <Text style={styles.subtitle}>
+            Comienza a explorar los mejores rincones de Colón
+          </Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.roleTitle}>¿Cómo usarás la app?</Text>
           <View style={styles.roleContainer}>
             <TouchableOpacity
-              style={[styles.roleButton, role === 'turista' && styles.roleButtonActive]}
-              onPress={() => setRole('turista')}
+              style={[
+                styles.roleButton,
+                role === "turista" && styles.roleButtonActive,
+              ]}
+              onPress={() => setRole("turista")}
             >
               <Ionicons
                 name="airplane-outline"
                 size={20}
-                color={role === 'turista' ? '#fff' : '#6B7280'}
+                color={role === "turista" ? "#fff" : "#6B7280"}
               />
-              <Text style={[styles.roleButtonText, role === 'turista' && styles.roleButtonTextActive]}>
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  role === "turista" && styles.roleButtonTextActive,
+                ]}
+              >
                 Soy Turista
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.roleButton, role === 'habitante' && styles.roleButtonActive]}
-              onPress={() => setRole('habitante')}
+              style={[
+                styles.roleButton,
+                role === "habitante" && styles.roleButtonActive,
+              ]}
+              onPress={() => setRole("habitante")}
             >
               <Ionicons
                 name="home-outline"
                 size={20}
-                color={role === 'habitante' ? '#fff' : '#6B7280'}
+                color={role === "habitante" ? "#fff" : "#6B7280"}
               />
-              <Text style={[styles.roleButtonText, role === 'habitante' && styles.roleButtonTextActive]}>
+              <Text
+                style={[
+                  styles.roleButtonText,
+                  role === "habitante" && styles.roleButtonTextActive,
+                ]}
+              >
                 Vivo Aquí
               </Text>
             </TouchableOpacity>
@@ -85,7 +119,12 @@ export default function RegisterScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nombre Completo</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+              <Ionicons
+                name="person-outline"
+                size={20}
+                color="#9CA3AF"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Juan Pérez"
@@ -98,7 +137,12 @@ export default function RegisterScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Correo Electrónico</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color="#9CA3AF"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="tu@correo.com"
@@ -113,7 +157,12 @@ export default function RegisterScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Contraseña</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color="#9CA3AF"
+                style={styles.inputIcon}
+              />
               <TextInput
                 style={styles.input}
                 placeholder="Mínimo 6 caracteres"
@@ -124,7 +173,10 @@ export default function RegisterScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleRegister}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleRegister}
+          >
             <Text style={styles.primaryButtonText}>Registrarme</Text>
             <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
           </TouchableOpacity>
@@ -135,24 +187,84 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: "#F3F4F6" },
   scrollContent: { padding: 20, paddingTop: 50 },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   header: { marginBottom: 24 },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#1F2937' },
-  subtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 5 },
-  roleTitle: { fontSize: 13, fontWeight: '600', color: '#4B5563', marginBottom: 8 },
-  roleContainer: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  roleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  roleButtonActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-  roleButtonText: { fontSize: 14, fontWeight: '600', color: '#4B5563' },
-  roleButtonTextActive: { color: '#fff' },
+  title: { fontSize: 26, fontWeight: "bold", color: "#1F2937" },
+  subtitle: { fontSize: 14, color: "#6B7280", marginTop: 4 },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  roleTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4B5563",
+    marginBottom: 8,
+  },
+  roleContainer: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  roleButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  roleButtonActive: { backgroundColor: "#4F46E5", borderColor: "#4F46E5" },
+  roleButtonText: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
+  roleButtonTextActive: { color: "#fff" },
   inputGroup: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12 },
+  label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+  },
   inputIcon: { marginRight: 8 },
-  input: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#1F2937' },
-  primaryButton: { backgroundColor: '#4F46E5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, marginTop: 8, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  input: { flex: 1, paddingVertical: 12, fontSize: 15, color: "#1F2937" },
+  primaryButton: {
+    backgroundColor: "#4F46E5",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+    shadowColor: "#4F46E5",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
 });

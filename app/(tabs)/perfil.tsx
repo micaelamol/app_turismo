@@ -84,7 +84,7 @@ export default function ProfileScreen() {
             <Text style={styles.userEmail}>{user?.email || 'turista@miciudad.com'}</Text>
             <View style={styles.roleTag}>
               <Text style={styles.roleTagText}>
-                {user?.role === 'turista' ? '✈️ Modo Turista' : '🏡 Modo Habitante'}
+                {user?.role === 'turista' ? '✈️ Modo Turista' : '🏡 Modo Administrador'}
               </Text>
             </View>
           </View>
