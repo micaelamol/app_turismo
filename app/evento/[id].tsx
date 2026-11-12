@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { useAgendaEventos } from '../../src/hooks/useAgendaEventos';
 import { eventoGuardadoAEvento, obtenerEventoGuardado } from '../../src/servicios/agendaDb';
@@ -41,6 +42,8 @@ export default function EventoDetailScreen() {
   const eventoId = String(params.id ?? '');
 
   const { getEventById } = usePlaces();
+  const { user } = useAuth();
+  const usuarioId = user?.id ?? 'local';
   const { estaGuardado, tieneRecordatorio, guardarEvento, quitarEvento } = useAgendaEventos();
 
   const [evento, setEvento] = useState<CityEvent | null>(null);
@@ -75,7 +78,7 @@ export default function EventoDetailScreen() {
         }
       } catch {
         // Sin conexión: intentamos con la copia guardada para offline.
-        const guardado = await obtenerEventoGuardado(eventoId);
+        const guardado = await obtenerEventoGuardado(eventoId, usuarioId);
         if (!activo) return;
 
         if (guardado) {

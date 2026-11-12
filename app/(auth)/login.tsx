@@ -16,14 +16,12 @@ import { useAuth } from "../../src/context/AuthContext";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, entrarConBiometria, haySesionGuardada, entrarComoInvitado } =
+    useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<"admin" | "turista">(
-    "turista",
-  );
 
   const handleLogin = async () => {
     const emailLimpio = email.trim();
@@ -54,15 +52,48 @@ export default function LoginScreen() {
       setLoading(true);
       await login(emailLimpio, password);
       router.replace("/(tabs)");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo iniciar sesión. Revisa tus datos.");
+    } catch (error: any) {
+      // Si la API contestó, mostramos su mensaje; si no, el problema es de red.
+      const mensajeApi = error?.response?.data?.error?.mensaje;
+      const mensaje = mensajeApi
+        ? mensajeApi
+        : error?.code === "ECONNABORTED"
+          ? "La API tardó demasiado en responder."
+          : "No pudimos conectar con la API. Revisá que esté encendida y en la misma red wifi.";
+      Alert.alert("No se pudo ingresar", mensaje);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGuestLogin = () => {
+    entrarComoInvitado();
     router.replace("/(tabs)");
+  };
+
+  // Reingreso rápido: no pide la contraseña, usa la sesión guardada y la
+  // desbloquea con la huella o el rostro del teléfono.
+  const handleBiometricLogin = async () => {
+    setLoading(true);
+    try {
+      const resultado = await entrarConBiometria();
+
+      if (resultado === "ok") {
+        router.replace("/(tabs)");
+        return;
+      }
+
+      const mensajes = {
+        "sin-sesion": "Primero ingresá una vez con tu correo y contraseña.",
+        "no-disponible": "Este teléfono no tiene huella o rostro configurado.",
+        cancelada: "Cancelaste la verificación.",
+        fallida: "No pudimos verificar tu identidad. Probá de nuevo.",
+      } as const;
+
+      Alert.alert("Acceso con huella", mensajes[resultado]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -79,53 +110,6 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.roleTitle}>Selecciona tu perfil:</Text>
-        <View style={styles.roleContainer}>
-          <TouchableOpacity
-            style={[
-              styles.roleButton,
-              selectedRole === "admin" && styles.roleButtonActive,
-            ]}
-            onPress={() => setSelectedRole("turista")}
-          >
-            <Ionicons
-              name="airplane-outline"
-              size={20}
-              color={selectedRole === "turista" ? "#fff" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.roleButtonText,
-                selectedRole === "turista" && styles.roleButtonTextActive,
-              ]}
-            >
-              Turista
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.roleButton,
-              selectedRole === "turista" && styles.roleButtonActive,
-            ]}
-            onPress={() => setSelectedRole("turista")}
-          >
-            <Ionicons
-              name="home-outline"
-              size={20}
-              color={selectedRole === "turista" ? "#fff" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.roleButtonText,
-                selectedRole === "turista" && styles.roleButtonTextActive,
-              ]}
-            >
-              Colonense
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Correo Electrónico</Text>
           <View style={styles.inputContainer}>
@@ -179,17 +163,17 @@ export default function LoginScreen() {
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.biometricButton}
-            onPress={() =>
-              Alert.alert(
-                "Acceso Biométrico",
-                "Iniciando reconocimiento de huella o rostro con SecureStore...",
-              )
-            }
-          >
-            <Ionicons name="finger-print" size={24} color="#4F46E5" />
-          </TouchableOpacity>
+          {/* Solo si hay una sesión guardada que desbloquear. */}
+          {haySesionGuardada && (
+            <TouchableOpacity
+              style={styles.biometricButton}
+              onPress={handleBiometricLogin}
+              disabled={loading}
+              accessibilityLabel="Entrar con huella o rostro"
+            >
+              <Ionicons name="finger-print" size={24} color="#4F46E5" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity
@@ -251,22 +235,6 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginBottom: 8,
   },
-  roleContainer: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  roleButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  roleButtonActive: { backgroundColor: "#4F46E5", borderColor: "#4F46E5" },
-  roleButtonText: { fontSize: 14, fontWeight: "600", color: "#4B5563" },
-  roleButtonTextActive: { color: "#fff" },
   inputGroup: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
   inputContainer: {

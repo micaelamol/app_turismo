@@ -15,11 +15,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PlacesMap from '../../src/componentes/PlacesMap';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
+import { distanciaMetros, formatearDistancia } from '../../src/utils/geo';
 
 export default function MapScreen() {
   const router = useRouter();
-  const { filteredPlaces, selectedCategory, setSelectedCategory, categories } = usePlaces();
+  const {
+    filteredPlaces,
+    selectedCategory,
+    setSelectedCategory,
+    categories,
+    userLocation,
+  } = usePlaces();
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(filteredPlaces[0] || null);
+
+  // PRD §2: "una lista de lo que tenés cerca ordenada por distancia".
+  // El servidor no manda la distancia, así que se calcula en el teléfono.
+  const cercanos = React.useMemo(
+    () =>
+      filteredPlaces
+        .map((place: Place) => ({
+          place,
+          metros: distanciaMetros(userLocation, place.coordinates),
+        }))
+        .sort((a, b) => a.metros - b.metros),
+    [filteredPlaces, userLocation]
+  );
+
+  const metrosDelSeleccionado = selectedPlace
+    ? distanciaMetros(userLocation, selectedPlace.coordinates)
+    : null;
 
   useEffect(() => {
     if (
@@ -79,12 +103,13 @@ export default function MapScreen() {
         />
 
         <View style={styles.quickSelectBar}>
+          <Text style={styles.quickSelectTitle}>Lo que tenés cerca</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 12, gap: 8 }}
           >
-            {filteredPlaces.map((place: Place) => {
+            {cercanos.map(({ place, metros }) => {
               const isSelected = selectedPlace?.id === place.id;
               return (
                 <TouchableOpacity
@@ -93,7 +118,7 @@ export default function MapScreen() {
                   onPress={() => setSelectedPlace(place)}
                 >
                   <Text style={[styles.quickChipText, isSelected && styles.quickChipTextActive]}>
-                    {place.title.split(' ')[0]} {place.title.split(' ')[1] || ''}
+                    {place.title} · {formatearDistancia(metros)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -125,6 +150,14 @@ export default function MapScreen() {
               <Text style={styles.cardAddress} numberOfLines={1}>
                 {selectedPlace.address}
               </Text>
+              {metrosDelSeleccionado !== null && (
+                <View style={styles.cardDistanceRow}>
+                  <Ionicons name="walk-outline" size={13} color="#4F46E5" />
+                  <Text style={styles.cardDistance}>
+                    A {formatearDistancia(metrosDelSeleccionado)} de donde estás
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.cardActionRow}>
                 <TouchableOpacity
@@ -238,7 +271,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#4F46E5',
   },
-  btnMapsText: { fontSize: 12, fontWeight: 'bold', color: '#fff' },
+  btnMapsText: { fontSize: 12, fontWeight: 'bold', color: '#fff' },  cardDistanceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  cardDistance: { fontSize: 12, color: '#4F46E5', fontWeight: '600' },
+  quickSelectTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#374151',
+    textTransform: 'uppercase',
+    marginLeft: 14,
+    marginBottom: 6,
+  },
 });
 
 

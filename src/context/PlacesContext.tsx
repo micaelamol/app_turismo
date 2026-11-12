@@ -1,11 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Location from 'expo-location';
+import * as Network from 'expo-network';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { obtenerCategorias } from '../servicios/categories';
 import { cargarCatalogo, refrescarCatalogo } from '../servicios/catalogo';
 import { obtenerEventos } from '../servicios/events';
+import { agregarFavorito, obtenerFavoritos, quitarFavorito } from '../servicios/favoritos';
+import {
+  obtenerVisitasDeLaCuenta,
+  sincronizarVisitasPendientes,
+} from '../servicios/visitas';
 import {
   actualizarVisita,
   eliminarVisitaDeDb,
@@ -13,9 +19,11 @@ import {
   eliminarVisitasDeLugar,
   guardarSnapshotVisita,
   guardarVisita,
+  guardarVisitaDelServidor,
   inicializarVisitasDb,
   listarVisitas,
   migrarVisitasLegado,
+  adoptarVisitasLocales,
 } from '../servicios/visitasDb';
 import {
   Category,
@@ -34,7 +42,12 @@ const COLON_LAT = -32.2241;
 const COLON_LNG = -58.1411;
 
 // Clave propia (con prefijo distinto) para no chocar con la persistencia general.
+// Cada cuenta tiene su propia copia; 'local' es lo hecho sin sesión.
 const CLAVE_FAVORITOS = '@colon:favoritos_v1';
+
+function claveFavoritos(usuarioId: string): string {
+  return `${CLAVE_FAVORITOS}:${usuarioId}`;
+}
 
 export type PermisoUbicacion = 'desconocido' | 'concedido' | 'denegado';
 
@@ -197,39 +210,171 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // PRD §4/§7: cargar la cola local de visitas y migrar el historial anterior.
+  /**
+   * Sube la cola de visitas en segundo plano. Si subió alguna, relee la lista
+   * para que la pantalla muestre el estado real.
+   */
+  const empujarVisitas = (id: string): void => {
+    if (!id || id === 'local') return;
+
+    sincronizarVisitasPendientes(id)
+      .then(async (subidas) => {
+        if (subidas > 0) setVisitas(await listarVisitas(id));
+      })
+      .catch((e) => console.warn('No se pudo subir la cola de visitas', e));
+  };
+
+  // PRD §4/§7: cargar la cola local de visitas del usuario actual.
   const recargarVisitas = async (): Promise<void> => {
     try {
       await inicializarVisitasDb();
       await migrarVisitasLegado(usuarioId);
-      const lista = await listarVisitas();
+
+      // Lo que se hizo sin cuenta pasa a la cuenta que acaba de entrar.
+      if (usuarioId !== 'local') {
+        await adoptarVisitasLocales(usuarioId);
+      }
+
+      const lista = await listarVisitas(usuarioId);
       setVisitas(lista);
+
+      // Lo que quedó sin subir (sin señal o de cuando era invitado) se manda ahora.
+      empujarVisitas(usuarioId);
     } catch (e) {
       console.warn('Error al leer las visitas guardadas', e);
     }
   };
 
   useEffect(() => {
+    setVisitas([]);
     recargarVisitas();
-    // El historial local pertenece al dispositivo, no a una sesión puntual.
+    // Cada cuenta ve su propio recorrido; al cerrar sesión vuelve a 'local'.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [usuarioId]);
 
-  // Favoritos guardados en el teléfono (PRD §3: la app recuerda lo que marcaste).
+  // Favoritos guardados en el teléfono, separados por cuenta (PRD §3 y §5).
+  // Al entrar, lo marcado como invitado y lo que ya tenía la cuenta en el
+  // servidor se suman a la copia local.
   useEffect(() => {
-    (async () => {
+    let vivo = true;
+    setFavorites([]);
+
+    const leerLista = (valor: string | null): string[] => {
+      if (!valor) return [];
       try {
-        const guardados = await AsyncStorage.getItem(CLAVE_FAVORITOS);
-        if (!guardados) return;
-        const lista = JSON.parse(guardados);
-        if (Array.isArray(lista)) {
-          setFavorites(lista.filter((id) => typeof id === 'string'));
+        const lista = JSON.parse(valor);
+        return Array.isArray(lista) ? lista.filter((id) => typeof id === 'string') : [];
+      } catch {
+        return [];
+      }
+    };
+
+    (async () => {
+      const clave = claveFavoritos(usuarioId);
+      let unidos: string[] = [];
+
+      try {
+        unidos = leerLista(await AsyncStorage.getItem(clave));
+
+        // Copia vieja, cuando todos los favoritos compartían una sola clave.
+        const legado = await AsyncStorage.getItem(CLAVE_FAVORITOS);
+        if (legado) {
+          unidos = Array.from(new Set([...unidos, ...leerLista(legado)]));
+          await AsyncStorage.removeItem(CLAVE_FAVORITOS);
         }
       } catch (e) {
         console.warn('No se pudieron leer los favoritos guardados', e);
       }
+
+      if (usuarioId !== 'local') {
+        try {
+          const invitado = leerLista(await AsyncStorage.getItem(claveFavoritos('local')));
+          if (invitado.length > 0) {
+            unidos = Array.from(new Set([...unidos, ...invitado]));
+            await AsyncStorage.removeItem(claveFavoritos('local'));
+          }
+        } catch (e) {
+          console.warn('No se pudieron pasar los favoritos de invitado', e);
+        }
+
+        let delServidor: string[] | null = null;
+        try {
+          delServidor = await obtenerFavoritos();
+          unidos = Array.from(new Set([...unidos, ...delServidor]));
+        } catch (e) {
+          console.warn('No se pudieron bajar los favoritos de la cuenta', e);
+        }
+
+        // Lo marcado como invitado (o lo que quedó solo en este teléfono) viaja
+        // a la cuenta: si no, se pierde al cambiar de teléfono (PRD §5).
+        if (delServidor) {
+          const faltan = unidos.filter((id) => !delServidor!.includes(id));
+          await Promise.allSettled(faltan.map((id) => agregarFavorito(id)));
+        }
+      }
+
+      if (!vivo) return;
+
+      setFavorites(unidos);
+      AsyncStorage.setItem(clave, JSON.stringify(unidos)).catch((e) =>
+        console.warn('No se pudieron guardar los favoritos', e)
+      );
     })();
-  }, []);
+
+    return () => {
+      vivo = false;
+    };
+  }, [usuarioId]);
+
+  // PRD §4: las visitas de la cuenta también viven en el servidor. Al entrar se
+  // bajan y se copian a recorrido_offline.db, así el recorrido arranca con datos
+  // aunque después se corte la señal.
+  useEffect(() => {
+    if (!user) return;
+    let vivo = true;
+
+    (async () => {
+      try {
+        const delServidor = await obtenerVisitasDeLaCuenta();
+        if (!vivo) return;
+
+        const lugares = new Map(rawPlaces.map((p) => [p.id, p]));
+        for (const visita of delServidor) {
+          await guardarVisitaDelServidor(visita);
+          const lugar = lugares.get(visita.lugarId);
+          if (lugar) {
+            await guardarSnapshotVisita(
+              visita.id,
+              lugar.nombre || lugar.title || '',
+              lugar.imageUrl || lugar.imagenes?.[0] || null
+            );
+          }
+        }
+
+        if (vivo) await recargarVisitas();
+      } catch (e) {
+        console.warn('No se pudieron bajar las visitas de la cuenta', e);
+      }
+    })();
+
+    return () => {
+      vivo = false;
+    };
+    // El catálogo ya está cargado cuando el usuario inicia sesión.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // PRD §7: cuando vuelve la señal, se sube lo que quedó en la cola.
+  useEffect(() => {
+    if (usuarioId === 'local') return;
+
+    const suscripcion = Network.addNetworkStateListener((estado) => {
+      if (estado.isConnected) empujarVisitas(usuarioId);
+    });
+
+    return () => suscripcion.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuarioId]);
 
   // Visitas más recientes primero. `visitedPlaces` y `visitPhotos` se derivan
   // de acá para que las pantallas viejas sigan funcionando igual.
@@ -296,14 +441,21 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.warn('No se pudo guardar la visita en SQLite', e);
     }
 
+    // Con sesión se sube sola; si no hay señal queda en la cola.
+    empujarVisitas(usuarioId);
+
     return visita;
   };
 
   const actualizarNotaVisita = async (visitaId: string, nota: string): Promise<void> => {
     const limpia = nota.trim() ? nota.trim() : null;
-    setVisitas((prev) => prev.map((v) => (v.id === visitaId ? { ...v, nota: limpia } : v)));
+    // Queda pendiente hasta que la API confirme el cambio.
+    setVisitas((prev) =>
+      prev.map((v) => (v.id === visitaId ? { ...v, nota: limpia, sincronizada: false } : v))
+    );
     try {
-      await actualizarVisita(visitaId, { nota: limpia });
+      await actualizarVisita(visitaId, { nota: limpia, sincronizada: false });
+      empujarVisitas(usuarioId);
     } catch (e) {
       console.warn('No se pudo actualizar la nota de la visita', e);
     }
@@ -376,7 +528,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (yaVisitado) {
       setVisitas((prev) => prev.filter((v) => v.lugarId !== placeId));
-      eliminarVisitasDeLugar(placeId).catch((e) =>
+      eliminarVisitasDeLugar(placeId, usuarioId).catch((e) =>
         console.warn('No se pudieron borrar las visitas del lugar', e)
       );
       return false;
@@ -396,9 +548,12 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const visita = visitasOrdenadas.find((v) => v.lugarId === placeId);
       if (visita) {
         setVisitas((prev) =>
-          prev.map((v) => (v.id === visita.id ? { ...v, fotoUri: destino } : v))
+          prev.map((v) =>
+            v.id === visita.id ? { ...v, fotoUri: destino, sincronizada: false } : v
+          )
         );
-        await actualizarVisita(visita.id, { fotoUri: destino });
+        await actualizarVisita(visita.id, { fotoUri: destino, sincronizada: false });
+        empujarVisitas(usuarioId);
       } else {
         await registrarVisita(placeId, { origen: 'manual', fotoUri: destino });
       }
@@ -566,18 +721,24 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const toggleFavorite = (placeId: string) => {
-    setFavorites((prev) => {
-      const siguiente = prev.includes(placeId)
-        ? prev.filter((id) => id !== placeId)
-        : [...prev, placeId];
+    const yaEstaba = favorites.includes(placeId);
+    const siguiente = yaEstaba
+      ? favorites.filter((id) => id !== placeId)
+      : [...favorites, placeId];
 
-      // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3).
-      AsyncStorage.setItem(CLAVE_FAVORITOS, JSON.stringify(siguiente)).catch((e) =>
-        console.warn('No se pudieron guardar los favoritos', e)
-      );
+    setFavorites(siguiente);
 
-      return siguiente;
-    });
+    // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3), pero cada
+    // cuenta (y el invitado) guarda los suyos.
+    AsyncStorage.setItem(claveFavoritos(usuarioId), JSON.stringify(siguiente)).catch((e) =>
+      console.warn('No se pudieron guardar los favoritos', e)
+    );
+
+    // Con sesión, el servidor también se entera (PRD §5).
+    if (user) {
+      const pedido = yaEstaba ? quitarFavorito(placeId) : agregarFavorito(placeId);
+      pedido.catch((e) => console.warn('No se pudo sincronizar el favorito', e));
+    }
   };
 
   const isFavorite = (placeId: string): boolean => {

@@ -27,14 +27,19 @@ export interface ResultadoRecordatorio {
 }
 
 // Handler global: hace que la notificación se muestre aunque la app esté abierta.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Lo comparten los recordatorios de la agenda y los avisos de proximidad.
+export function configurarHandlerNotificaciones(): void {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
+
+configurarHandlerNotificaciones();
 
 /** Canal obligatorio en Android 8+ para que el aviso tenga importancia y sonido. */
 export async function prepararCanalAgenda(): Promise<void> {

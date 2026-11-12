@@ -3,6 +3,7 @@ import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   StyleSheet,
@@ -17,7 +18,7 @@ import { Place } from '../../src/types';
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const { places, favorites, visitedPlaces, toggleFavorite } = usePlaces();
   const [activeTab, setActiveTab] = useState<'favorites' | 'visited'>('favorites');
 
@@ -25,6 +26,13 @@ export default function ProfileScreen() {
   const visitedPlacesList = places.filter((p: Place) => visitedPlaces.includes(p.id));
 
   const currentList = activeTab === 'favorites' ? favoritePlaces : visitedPlacesList;
+
+  const confirmarSalida = () => {
+    Alert.alert('Cerrar sesión', '¿Querés salir de tu cuenta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => { logout(); } },
+    ]);
+  };
 
   const renderItem = ({ item }: { item: Place }) => (
     <TouchableOpacity
@@ -71,54 +79,36 @@ export default function ProfileScreen() {
       {/* Perfil del Usuario */}
       <View style={styles.profileSection}>
         <View style={styles.profileRow}>
-          <Image
-            source={{
-              uri:
-                user?.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-            }}
-            style={styles.avatar}
-          />
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user?.name || 'Explorador'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'turista@miciudad.com'}</Text>
-            <View style={styles.roleTag}>
-              <Text style={styles.roleTagText}>
-                {user?.role === 'turista' ? '✈️ Modo Turista' : '🏡 Modo Habitante'}
-              </Text>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarVacio]}>
+              <Ionicons name="person" size={28} color="#9CA3AF" />
             </View>
+          )}
+          <View style={styles.profileInfo}>
+            <Text style={styles.userName}>{user?.nombre || 'Invitado'}</Text>
+            <Text style={styles.userEmail}>
+              {user?.email || 'Entrá para guardar tus favoritos y tu recorrido.'}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-            <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Cambiador rápido de perfil */}
-        <View style={styles.roleSwitchRow}>
-          <Text style={styles.switchLabel}>Cambiar Modo:</Text>
-          <TouchableOpacity
-            style={[styles.miniSwitch, user?.role === 'turista' && styles.miniSwitchActive]}
-            onPress={() => switchRole('turista')}
-          >
-            <Text
-              style={[styles.miniSwitchText, user?.role === 'turista' && styles.miniSwitchTextActive]}
+          {user ? (
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={confirmarSalida}
+              accessibilityLabel="Cerrar sesión"
             >
-              Turista
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.miniSwitch, user?.role === 'turista' && styles.miniSwitchActive]}
-            onPress={() => switchRole('turista')}
-          >
-            <Text
-              style={[
-                styles.miniSwitchText,
-                user?.role === 'turista' && styles.miniSwitchTextActive,
-              ]}
+              <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.loginBtn}
+              onPress={() => router.push('/(auth)/login')}
+              accessibilityLabel="Iniciar sesión"
             >
-              turista
-            </Text>
-          </TouchableOpacity>
+              <Text style={styles.loginBtnText}>Ingresar</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Estadísticas */}
@@ -132,6 +122,34 @@ export default function ProfileScreen() {
             <Text style={styles.statLabel}>Visitados</Text>
           </View>
         </View>
+
+        {/* Datos de la cuenta: nombre y foto (PATCH /yo). */}
+        {user && (
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => router.push('/cuenta')}
+            accessibilityLabel="Mi cuenta"
+          >
+            <View style={styles.menuIcon}>
+              <Ionicons name="person-outline" size={18} color="#4F46E5" />
+            </View>
+            <Text style={styles.menuText}>Mi cuenta</Text>
+            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+          </TouchableOpacity>
+        )}
+
+        {/* Preferencias de la cuenta (PRD §5) */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/preferencias')}
+          accessibilityLabel="Preferencias"
+        >
+          <View style={styles.menuIcon}>
+            <Ionicons name="settings-outline" size={18} color="#4F46E5" />
+          </View>
+          <Text style={styles.menuText}>Preferencias</Text>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </TouchableOpacity>
       </View>
 
       {/* Pestañas */}
@@ -212,38 +230,24 @@ const styles = StyleSheet.create({
   },
   profileRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatar: { width: 60, height: 60, borderRadius: 30, marginRight: 14 },
+  avatarVacio: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   profileInfo: { flex: 1 },
   userName: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   userEmail: { fontSize: 13, color: '#6B7280' },
-  roleTag: {
-    backgroundColor: '#EEF2FF',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  roleTagText: { fontSize: 11, fontWeight: 'bold', color: '#4F46E5' },
   logoutBtn: { padding: 8, backgroundColor: '#FEF2F2', borderRadius: 12 },
-  roleSwitchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    padding: 8,
+  loginBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#4F46E5',
     borderRadius: 12,
-    marginBottom: 16,
-    gap: 8,
   },
-  switchLabel: { fontSize: 12, fontWeight: '600', color: '#4B5563', marginLeft: 4 },
-  miniSwitch: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-  },
-  miniSwitchActive: { backgroundColor: '#4F46E5' },
-  miniSwitchText: { fontSize: 12, color: '#4B5563', fontWeight: '500' },
-  miniSwitchTextActive: { color: '#fff' },
+  loginBtnText: { fontSize: 13, fontWeight: 'bold', color: '#fff' },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
   statBox: {
     flex: 1,
@@ -256,6 +260,27 @@ const styles = StyleSheet.create({
   },
   statNumber: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
   statLabel: { fontSize: 12, color: '#6B7280', marginTop: 2 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#111827' },
   tabHeader: {
     flexDirection: 'row',
     backgroundColor: '#fff',

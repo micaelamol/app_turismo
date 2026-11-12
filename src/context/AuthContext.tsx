@@ -1,16 +1,27 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { RespuestaIngreso, User, UserRole } from "../types";
-import { httpClient } from "../servicios/client";
+import { RespuestaApiExito, RespuestaIngreso, User, Usuario } from "../types";
+import { activarSesion, httpClient } from "../servicios/client";
+import { pedirBiometria, ResultadoBiometria } from "../servicios/biometria";
+import {
+  aplicarTema,
+  guardarPreferenciasLocales,
+  PREFERENCIAS_INICIALES,
+} from "../servicios/preferencias";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
+  /** Hay token guardado: se puede ofrecer el reingreso con huella o rostro. */
+  haySesionGuardada: boolean;
+  /** El usuario eligió "Explorar como Invitado": puede ver las pestañas sin cuenta. */
+  modoInvitado: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, role: UserRole) => Promise<void>;
+  register: (nombre: string, email: string, contrasena: string) => Promise<void>;
+  entrarComoInvitado: () => void;
+  entrarConBiometria: () => Promise<ResultadoBiometria>;
+  actualizarUsuario: (usuario: User) => Promise<void>;
   logout: () => Promise<void>;
-  switchRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,132 +30,193 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [haySesionGuardada, setHaySesionGuardada] = useState<boolean>(false);
+  const [modoInvitado, setModoInvitado] = useState<boolean>(false);
+
+  // Deja al usuario en memoria, en SecureStore y aplica sus preferencias.
+  const aplicarUsuario = async (usuario: Usuario) => {
+    const preferencias = usuario.preferencias ?? PREFERENCIAS_INICIALES;
+
+    await Promise.all([
+      SecureStore.setItemAsync("user_data", JSON.stringify(usuario)),
+      guardarPreferenciasLocales(preferencias, usuario.id),
+    ]);
+
+    aplicarTema(preferencias.tema);
+    activarSesion(true);
+    setHaySesionGuardada(true);
+    setModoInvitado(false);
+    setUser(usuario);
+  };
+
+  const guardarSesion = async (token: string, usuario: Usuario) => {
+    await SecureStore.setItemAsync("user_token", token);
+    await aplicarUsuario(usuario);
+  };
+
+  // Cierra la sesión en el teléfono. No toca los datos guardados de la cuenta:
+  // favoritos, visitas y agenda quedan separados por usuarioId y vuelven al
+  // entrar de nuevo.
+  const cerrarSesionLocal = async () => {
+    await Promise.all([
+      SecureStore.deleteItemAsync("user_token"),
+      SecureStore.deleteItemAsync("user_data"),
+    ]);
+    activarSesion(false);
+    aplicarTema("sistema");
+    setHaySesionGuardada(false);
+    setModoInvitado(false);
+    setUser(null);
+  };
+
+  /**
+   * Pide el usuario a la API. Sirve para dos cosas: saber si el token todavía
+   * vale (vence a los 30 días) y traer los cambios hechos desde otro teléfono.
+   * Sin conexión seguimos con la copia guardada.
+   */
+  const refrescarSesion = async () => {
+    try {
+      const res = await httpClient.get<RespuestaApiExito<Usuario>>("/yo", {
+        sinCerrarSesion: true,
+      });
+      await aplicarUsuario(res.data.datos);
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        await cerrarSesionLocal();
+      }
+    }
+  };
 
   useEffect(() => {
-    // Inicializar sesión por defecto o restaurar
+    // Restaurar la sesión: el token y el usuario quedan guardados en SecureStore.
+    // Ojo: acá NO se pide la huella. En Android, si el diálogo del sistema se
+    // abre apenas arranca Expo Go, la promesa de authenticateAsync queda
+    // colgada para siempre y la app se queda en la pantalla de arranque.
+    // Por eso primero mostramos el login y el desbloqueo se pide desde el
+    // botón de huella, con la app ya en primer plano.
     const initSession = async () => {
       try {
-        // En una app completa se usaría AsyncStorage aquí
-        // Iniciamos con una sesión de ejemplo amigable
+        const [token, usuarioGuardado] = await Promise.all([
+          SecureStore.getItemAsync("user_token"),
+          SecureStore.getItemAsync("user_data"),
+        ]);
 
-        const token = await SecureStore.getItemAsync("user_token");
-        if (!token) {
-          setUser(null);
-          setIsLoading(false);
+        if (!token || !usuarioGuardado) return;
 
-          return;
-        }
-
-        /* setUser({
-          id: "u-1",
-          name: "Turista Explorador",
-          email: "turista@miciudad.com",
-          role: "turista",
-          avatar:
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-        }); */
+        setHaySesionGuardada(true);
       } catch (e) {
         console.error("Error restaurando sesión:", e);
-      } finally {
-        setIsLoading(false);
       }
     };
 
     initSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (email: string, contrasena: string) => {
-    setIsLoading(true);
-    try {
-      const res = await httpClient.post<RespuestaIngreso>("/auth/ingreso", {
-        email,
-        contrasena,
-      });
-      console.log("log: ", res.data);
-      const { token, usuario } = res.data.datos;
-      setUser(usuario);
-      await SecureStore.setItemAsync("user_token", token);
-
-      /* setUser({
-        id: "u-1",
-        nombre: "prueba",
-        email,
-        avatarUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
-      }); */
-    } catch (e: any) {
-      console.log(e);
-      if (e.response) {
-        // Acá NestJS te dice exactamente qué campo no pasó la validación:
-        console.log(
-          "Detalle del 400:",
-          JSON.stringify(e.response.data, null, 2),
-        );
-      }
-    } finally {
-      setIsLoading(false);
-    }
-
-    /* // Simular inicio de sesión
-    setTimeout(() => {
-      setUser({
-        id: 'u-1',
-        name: role === 'turista' ? 'Turista Explorador' : 'Vecino Local',
-        email,
-        role,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      });
-      setIsLoading(false);
-    }, 500); */
+    const res = await httpClient.post<RespuestaIngreso>("/auth/ingreso", {
+      email,
+      contrasena,
+    });
+    await guardarSesion(res.data.datos.token, res.data.datos.usuario);
   };
 
-  const register = async (name: string, email: string, role: UserRole) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setUser({
-        id: `u-${Date.now()}`,
-        name,
-        email,
-        role,
-        avatar:
-          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80",
-      });
-      setIsLoading(false);
-    }, 500);
+  // El registro público siempre crea una cuenta con el rol común ("turista").
+  // El back devuelve la sesión armada, igual que el ingreso.
+  const register = async (nombre: string, email: string, contrasena: string) => {
+    const res = await httpClient.post<RespuestaIngreso>("/auth/registro", {
+      nombre,
+      email,
+      contrasena,
+    });
+    await guardarSesion(res.data.datos.token, res.data.datos.usuario);
+  };
+
+  // Reingreso con huella o rostro sobre la sesión que ya está guardada.
+  const entrarConBiometria = async (): Promise<ResultadoBiometria> => {
+    const [token, usuarioGuardado] = await Promise.all([
+      SecureStore.getItemAsync("user_token"),
+      SecureStore.getItemAsync("user_data"),
+    ]);
+
+    if (!token || !usuarioGuardado) return "sin-sesion";
+
+    const resultado = await pedirBiometria("Entrá a Colón Turismo");
+    if (resultado === "ok") {
+      const usuario = JSON.parse(usuarioGuardado) as Usuario;
+      aplicarTema((usuario.preferencias ?? PREFERENCIAS_INICIALES).tema);
+      activarSesion(true);
+      setModoInvitado(false);
+      setUser(usuario);
+      refrescarSesion();
+    }
+    return resultado;
+  };
+
+  // "Explorar como Invitado": las pestañas se abren sin cuenta. Es solo de esta
+  // sesión de la app; al cerrarla, vuelve a pedir el login.
+  const entrarComoInvitado = () => {
+    setModoInvitado(true);
+  };
+
+  // Lo usan las pantallas que cambian datos de la cuenta (preferencias, perfil).
+  const actualizarUsuario = async (usuario: Usuario) => {
+    await aplicarUsuario(usuario);
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync("user_token");
-    setUser(null);
-    router.push("/(auth)/login");
+    await cerrarSesionLocal();
+    router.replace("/(auth)/login");
   };
 
   useEffect(() => {
-    // 1. Axios lo activa de inmediato para TODAS las peticiones y devuelve su ID
+    // Un 401 en una ruta con sesión cierra la sesión. En /auth no: ahí el 401
+    // significa "contraseña incorrecta" y lo maneja la pantalla de login.
+    let cerrando = false;
     const interceptorId = httpClient.interceptors.response.use(
       (respuesta) => respuesta,
       async (error) => {
-        if (error.response?.status === 401) await logout();
+        const url = String(error.config?.url ?? "");
+        const enAuth = url.includes("/auth/");
+
+        if (
+          error.response?.status === 401 &&
+          !enAuth &&
+          !error.config?.sinCerrarSesion &&
+          !cerrando
+        ) {
+          cerrando = true;
+          try {
+            await cerrarSesionLocal();
+            router.replace("/(auth)/login");
+          } finally {
+            cerrando = false;
+          }
+        }
         return Promise.reject(error);
       },
     );
 
-    // 2. Función de limpieza (cleanup): solo se ejecuta si AuthProvider se desmonta
+    // Función de limpieza: solo se ejecuta si AuthProvider se desmonta.
     return () => {
       httpClient.interceptors.response.eject(interceptorId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const switchRole = (role: UserRole) => {
-    if (user) {
-      setUser({ ...user, role });
-    }
-  };
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, register, logout, switchRole }}
+      value={{
+        user,
+        haySesionGuardada,
+        modoInvitado,
+        login,
+        register,
+        entrarComoInvitado,
+        entrarConBiometria,
+        actualizarUsuario,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>

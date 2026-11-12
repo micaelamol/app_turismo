@@ -44,6 +44,12 @@
       "expo-sqlite",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite usar Face ID para entrar a tu cuenta."
+        }
+      ],
+      [
         "expo-audio",
         {
           "enableBackgroundPlayback": true

@@ -158,8 +158,8 @@ export default function PlaceDetailScreen() {
     if (addReview) {
       addReview(
         place.id,
-        user?.name || 'Turista Explorador',
-        user?.avatar,
+        user?.nombre || 'Turista Explorador',
+        user?.avatarUrl ?? undefined,
         modalRating,
         modalComment.trim(),
         modalPhoto.trim() || undefined

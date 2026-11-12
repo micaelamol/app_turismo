@@ -14,27 +14,51 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import type { UserRole } from '../../src/types';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { register } = useAuth();
-  const [name, setName] = useState('');
+  const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'turista' | 'habitante'>('turista');
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
-    if (!name || !email) {
-      Alert.alert('Campos incompletos', 'Por favor ingresa tu nombre y correo.');
+  const handleRegister = async () => {
+    const nombreLimpio = nombre.trim();
+    const emailLimpio = email.trim();
+
+    if (!nombreLimpio) {
+      Alert.alert('Falta tu nombre', 'Escribí cómo querés que te llamemos.');
       return;
     }
-    if (register) {
-      // "habitante" todavía no es un rol del back, pero lo guardamos igual en el usuario local
-      register(name, email, role as UserRole);
+
+    if (!/^\S+@\S+\.\S+$/.test(emailLimpio)) {
+      Alert.alert('Correo inválido', 'Escribí un correo electrónico válido.');
+      return;
     }
-    // Una vez registrado, lo mandamos directo al inicio de la app
-    router.replace('/(tabs)');
+
+    // El back pide al menos 8 caracteres.
+    if (password.length < 8) {
+      Alert.alert('Contraseña corta', 'Tiene que tener al menos 8 caracteres.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await register(nombreLimpio, emailLimpio, password);
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      // Si la API contestó, mostramos su mensaje; si no, el problema es de red.
+      const mensajeApi = error?.response?.data?.error?.mensaje;
+      const mensaje = mensajeApi
+        ? mensajeApi
+        : error?.code === 'ECONNABORTED'
+          ? 'La API tardó demasiado en responder.'
+          : 'No pudimos conectar con la API. Revisá que esté encendida y en la misma red wifi.';
+      Alert.alert('No se pudo crear la cuenta', mensaje);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,37 +77,6 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.roleTitle}>¿Cómo usarás la app?</Text>
-          <View style={styles.roleContainer}>
-            <TouchableOpacity
-              style={[styles.roleButton, role === 'turista' && styles.roleButtonActive]}
-              onPress={() => setRole('turista')}
-            >
-              <Ionicons
-                name="airplane-outline"
-                size={20}
-                color={role === 'turista' ? '#fff' : '#6B7280'}
-              />
-              <Text style={[styles.roleButtonText, role === 'turista' && styles.roleButtonTextActive]}>
-                Soy Turista
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.roleButton, role === 'habitante' && styles.roleButtonActive]}
-              onPress={() => setRole('habitante')}
-            >
-              <Ionicons
-                name="home-outline"
-                size={20}
-                color={role === 'habitante' ? '#fff' : '#6B7280'}
-              />
-              <Text style={[styles.roleButtonText, role === 'habitante' && styles.roleButtonTextActive]}>
-                Vivo Aquí
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nombre Completo</Text>
             <View style={styles.inputContainer}>
@@ -91,8 +84,9 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Juan Pérez"
-                value={name}
-                onChangeText={setName}
+                value={nombre}
+                onChangeText={setNombre}
+                autoCapitalize="words"
               />
             </View>
           </View>
@@ -108,6 +102,7 @@ export default function RegisterScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
           </View>
@@ -118,19 +113,31 @@ export default function RegisterScreen() {
               <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                autoCapitalize="none"
               />
             </View>
           </View>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleRegister}>
-            <Text style={styles.primaryButtonText}>Registrarme</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+            onPress={handleRegister}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? 'Creando cuenta...' : 'Registrarme'}
+            </Text>
             <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={styles.footer} onPress={() => router.replace('/(auth)/login')}>
+          <Text style={styles.footerText}>¿Ya tenés cuenta?</Text>
+          <Text style={styles.footerLink}>Ingresá</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -144,17 +151,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: 'bold', color: '#1F2937' },
   subtitle: { fontSize: 14, color: '#6B7280', marginTop: 4 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 5 },
-  roleTitle: { fontSize: 13, fontWeight: '600', color: '#4B5563', marginBottom: 8 },
-  roleContainer: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  roleButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
-  roleButtonActive: { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
-  roleButtonText: { fontSize: 14, fontWeight: '600', color: '#4B5563' },
-  roleButtonTextActive: { color: '#fff' },
   inputGroup: { marginBottom: 16 },
   label: { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 12 },
   inputIcon: { marginRight: 8 },
   input: { flex: 1, paddingVertical: 12, fontSize: 15, color: '#1F2937' },
   primaryButton: { backgroundColor: '#4F46E5', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, marginTop: 8, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 },
+  primaryButtonDisabled: { opacity: 0.6 },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  footer: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 20 },
+  footerText: { fontSize: 14, color: '#6B7280' },
+  footerLink: { fontSize: 14, fontWeight: '600', color: '#4F46E5' },
 });
