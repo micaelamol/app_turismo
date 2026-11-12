@@ -41,7 +41,7 @@ export default function EventoDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const eventoId = String(params.id ?? '');
 
-  const { getEventById } = usePlaces();
+  const { getEventById, getPlaceById } = usePlaces() as any;
   const { user } = useAuth();
   const usuarioId = user?.id ?? 'local';
   const { estaGuardado, tieneRecordatorio, guardarEvento, quitarEvento } = useAgendaEventos();
@@ -77,7 +77,6 @@ export default function EventoDetailScreen() {
           setError('No encontramos el evento que buscás.');
         }
       } catch {
-        // Sin conexión: intentamos con la copia guardada para offline.
         const guardado = await obtenerEventoGuardado(eventoId, usuarioId);
         if (!activo) return;
 
@@ -95,19 +94,53 @@ export default function EventoDetailScreen() {
     return () => {
       activo = false;
     };
-    // getEventById se recrea en cada render del contexto: lo omitimos a propósito.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventoId]);
 
-  const abrirComoLlegar = async () => {
+    const abrirComoLlegar = async () => {
     if (!evento) return;
 
-    const coordenadas = evento.coordenadas;
-    const destino = coordenadas
-      ? `${coordenadas.latitud},${coordenadas.longitud}`
-      : encodeURIComponent(`${direccionEvento(evento)}, Colón, Entre Ríos`);
+    const ev = evento as any;
+    console.log('DATOS DEL EVENTO AL ABRIR MAPA:', JSON.stringify(ev, null, 2));
 
-    const url = `https://google.com{destino}`;
+    // Soporta lugarId, lugar_id o si el backend ya trae el objeto lugar anidado
+    const idLugar = ev.lugarId ?? ev.lugar_id ?? ev.lugar?.id;
+    const lugarAsociado = idLugar ? getPlaceById(idLugar) : ev.lugar ?? null;
+
+    const lat =
+      ev.coordenadas?.latitud ??
+      ev.latitud ??
+      lugarAsociado?.coordenadas?.latitud ??
+      lugarAsociado?.coordinates?.latitude ??
+      lugarAsociado?.latitud;
+
+    const lng =
+      ev.coordenadas?.longitud ??
+      ev.longitud ??
+      lugarAsociado?.coordenadas?.longitud ??
+      lugarAsociado?.coordinates?.longitude ??
+      lugarAsociado?.longitud;
+
+    const textoDireccion =
+      ev.direccionLibre ||
+      ev.direccion_libre ||
+      ev.direccion ||
+      lugarAsociado?.direccion ||
+      direccionEvento(evento);
+
+    let destino = '';
+
+    if (lat != null && lng != null) {
+      destino = `${lat},${lng}`;
+    } else if (textoDireccion) {
+      destino = encodeURIComponent(`${textoDireccion}, Colón, Entre Ríos, Argentina`);
+    } else {
+      Alert.alert('Sin ubicación', 'Este evento aún no tiene una dirección cargada.');
+      return;
+    }
+
+    const dominio = 'https://google.com';
+    const ruta = '/maps/dir/?api=1&destination=';
+    const url = dominio + ruta + destino;
 
     try {
       await Linking.openURL(url);
@@ -115,6 +148,7 @@ export default function EventoDetailScreen() {
       Alert.alert('No pudimos abrir el mapa', 'Probá buscando el lugar manualmente en tu app de mapas.');
     }
   };
+
 
   const alternarGuardado = async () => {
     if (!evento || procesando) return;
@@ -139,149 +173,6 @@ export default function EventoDetailScreen() {
       setProcesando(false);
     }
   };
-
-
-// import { Ionicons } from '@react-native-vector-icons/ionicons';
-// import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-// import React, { useEffect, useState } from 'react';
-// import {
-//   ActivityIndicator,
-//   Alert,
-//   Image,
-//   Linking,
-//   Platform,
-//   ScrollView,
-//   StyleSheet,
-//   Text,
-//   TouchableOpacity,
-//   View,
-// } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { usePlaces } from '../../src/context/PlacesContext';
-// import { useAgendaEventos } from '../../src/hooks/useAgendaEventos';
-// import { eventoGuardadoAEvento, obtenerEventoGuardado } from '../../src/servicios/agendaDb';
-// import { obtenerEventoPorId } from '../../src/servicios/events';
-// import { CityEvent } from '../../src/tipos';
-// import {
-//   colorEstadoEvento,
-//   descripcionEvento,
-//   direccionEvento,
-//   duracionEvento,
-//   etiquetaEstadoEvento,
-//   eventoYaPaso,
-//   formatearFechaEvento,
-//   formatearHoraEvento,
-//   imagenEvento,
-//   textoPrecioEvento,
-//   tituloEvento,
-// } from '../../src/utils/eventos';
-
-// export default function EventoDetailScreen() {
-//   const router = useRouter();
-//   const params = useLocalSearchParams<{ id: string }>();
-//   const eventoId = String(params.id ?? '');
-
-//   const { getEventById } = usePlaces();
-//   const { estaGuardado, tieneRecordatorio, guardarEvento, quitarEvento } = useAgendaEventos();
-
-//   const [evento, setEvento] = useState<CityEvent | null>(null);
-//   const [cargando, setCargando] = useState<boolean>(true);
-//   const [error, setError] = useState<string | null>(null);
-//   const [procesando, setProcesando] = useState<boolean>(false);
-//   const [imagenFallo, setImagenFallo] = useState<boolean>(false);
-
-//   useEffect(() => {
-//     let activo = true;
-
-//     const cargarEvento = async () => {
-//       const desdeContexto = getEventById(eventoId);
-//       if (desdeContexto) {
-//         if (activo) {
-//           setEvento(desdeContexto);
-//           setCargando(false);
-//         }
-//         return;
-//       }
-
-//       try {
-//         setCargando(true);
-//         setError(null);
-//         const respuesta = await obtenerEventoPorId(eventoId);
-//         if (!activo) return;
-
-//         if ('datos' in respuesta && respuesta.datos) {
-//           setEvento(respuesta.datos);
-//         } else {
-//           setError('No encontramos el evento que buscás.');
-//         }
-//       } catch {
-//         // Sin conexión: intentamos con la copia guardada para offline.
-//         const guardado = await obtenerEventoGuardado(eventoId);
-//         if (!activo) return;
-
-//         if (guardado) {
-//           setEvento(eventoGuardadoAEvento(guardado));
-//         } else {
-//           setError('No pudimos cargar el evento. Revisá tu conexión e intentá de nuevo.');
-//         }
-//       } finally {
-//         if (activo) setCargando(false);
-//       }
-//     };
-
-//     cargarEvento();
-//     return () => {
-//       activo = false;
-//     };
-//     // getEventById se recrea en cada render del contexto: lo omitimos a propósito.
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, [eventoId]);
-
-//   const abrirComoLlegar = async () => {
-//     if (!evento) return;
-
-//     const coordenadas = evento.coordenadas;
-//     const destino = coordenadas
-//       ? `${coordenadas.latitud},${coordenadas.longitud}`
-//       : encodeURIComponent(`${direccionEvento(evento)}, Colón, Entre Ríos`);
-
-//     const url =
-//       Platform.OS === 'ios'
-//         ? `maps:0,0?q=${destino}`
-//         : Platform.OS === 'android'
-//         ? `geo:0,0?q=${destino}`
-//         : `https://www.google.com/maps/search/?api=1&query=${destino}`;
-
-//     try {
-//       await Linking.openURL(url);
-//     } catch {
-//       Alert.alert('No pudimos abrir el mapa', 'Probá buscando el lugar manualmente en tu app de mapas.');
-//     }
-//   };
-
-//   const alternarGuardado = async () => {
-//     if (!evento || procesando) return;
-
-//     setProcesando(true);
-//     try {
-//       if (estaGuardado(evento.id)) {
-//         const resultado = await quitarEvento(evento.id);
-//         Alert.alert('Mi agenda', resultado.mensaje);
-//       } else {
-//         const resultado = await guardarEvento(evento);
-//         Alert.alert(
-//           !resultado.guardado
-//             ? 'No se pudo guardar'
-//             : resultado.recordatorioProgramado
-//             ? 'Guardado con recordatorio'
-//             : 'Guardado en mi agenda',
-//           resultado.mensaje
-//         );
-//       }
-//     } finally {
-//       setProcesando(false);
-//     }
-//   };
 
   if (cargando) {
     return (
