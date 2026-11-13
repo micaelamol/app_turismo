@@ -4,8 +4,9 @@
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { Directory, File, Paths } from 'expo-file-system';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatearTiempo, idiomaLegible, textoRestante } from '../servicios/audioguias';
 
 interface Props {
@@ -19,6 +20,18 @@ interface Props {
 const SALTO_SEGUNDOS = 15;
 const ESPERA_MAXIMA_MS = 8000;
 
+function resolverUrlEnDispositivo(rawUrl: string): string {
+  if (rawUrl.startsWith('file://')) return rawUrl;
+
+  const hostLocal = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+
+  if (rawUrl.startsWith('http')) {
+    return rawUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/, hostLocal);
+  }
+
+  return `${hostLocal}/${rawUrl.replace(/^\//, '')}`;
+}
+
 export default function ReproductorAudioguia({
   url,
   titulo,
@@ -26,7 +39,8 @@ export default function ReproductorAudioguia({
   idioma,
   disponibleOffline,
 }: Props) {
-  const player = useAudioPlayer(url, { updateInterval: 250 });
+  const [fuenteLista, setFuenteLista] = useState<string | null>(null);
+  const player = useAudioPlayer(fuenteLista, { updateInterval: 250 });
   const status = useAudioPlayerStatus(player);
 
   const [anchoBarra, setAnchoBarra] = useState(0);
@@ -39,20 +53,58 @@ export default function ReproductorAudioguia({
   const avance = total > 0 ? Math.min(1, actual / total) : 0;
   const cargando = status.isBuffering || (solicitando && !status.isLoaded);
 
-  // Sesión de audio: suena aunque el teléfono esté en silencio y sigue en segundo plano.
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: 'doNotMix',
-    }).catch(() => {
-      // Si el dispositivo no soporta este modo, la reproducción normal sigue andando.
-    });
+    }).catch(() => {});
 
     return () => {
       if (espera.current) clearTimeout(espera.current);
     };
   }, []);
+
+  useEffect(() => {
+    let activo = true;
+    const urlFinal = resolverUrlEnDispositivo(url);
+
+    (async () => {
+      try {
+        if (urlFinal.startsWith('file://')) {
+          if (activo) {
+            setFuenteLista(urlFinal);
+            player.replace(urlFinal);
+          }
+          return;
+        }
+
+        const carpeta = new Directory(Paths.cache, 'audioguias_tmp');
+        if (!carpeta.exists) carpeta.create();
+
+        const nombreArchivo = urlFinal.split('/').pop() || 'audio.mp3';
+        const destino = new File(carpeta, nombreArchivo);
+
+        // Si ya está descargado y no está vacío, lo usa directo (funciona sin internet)
+        if (!destino.exists || destino.size === 0) {
+          if (destino.exists) destino.delete();
+          await File.downloadFileAsync(urlFinal, destino);
+        }
+
+        if (activo) {
+          setFuenteLista(destino.uri);
+          player.replace(destino.uri);
+        }
+      } catch (err) {
+        console.error('Error cargando audioguía:', err);
+        if (activo) setFallo(true);
+      }
+    })();
+
+    return () => {
+      activo = false;
+    };
+  }, [url]);
 
   useEffect(() => {
     if (!status.isLoaded) return;
@@ -67,7 +119,7 @@ export default function ReproductorAudioguia({
   const esperarCarga = () => {
     if (espera.current) clearTimeout(espera.current);
     espera.current = setTimeout(() => {
-      if (!player.isLoaded) {
+      if (!status.isLoaded) {
         setFallo(true);
         setSolicitando(false);
       }
@@ -75,6 +127,8 @@ export default function ReproductorAudioguia({
   };
 
   const alternar = () => {
+    if (!fuenteLista) return;
+
     if (status.playing) {
       player.pause();
       return;
@@ -82,21 +136,17 @@ export default function ReproductorAudioguia({
 
     setFallo(false);
 
-    // Si el audio terminó (o falló antes), volvemos a empezar.
     if (status.didJustFinish || (total > 0 && actual >= total - 0.5)) {
       player.seekTo(0);
     }
 
-    // Android necesita esto para seguir sonando con la pantalla apagada.
     try {
       player.setActiveForLockScreen(true, {
         title: `Audioguía · ${titulo}`,
         artist: 'Colón Turismo',
         albumTitle: 'Audioguía',
       });
-    } catch {
-      // Expo Go no siempre tiene el servicio de fondo; el audio igual se reproduce.
-    }
+    } catch {}
 
     setSolicitando(true);
     player.play();
@@ -105,10 +155,12 @@ export default function ReproductorAudioguia({
 
   const reintentar = () => {
     setFallo(false);
-    setSolicitando(true);
-    player.replace(url);
-    player.play();
-    esperarCarga();
+    if (fuenteLista) {
+      setSolicitando(true);
+      player.replace(fuenteLista);
+      player.play();
+      esperarCarga();
+    }
   };
 
   const saltar = (segundos: number) => {
@@ -147,11 +199,6 @@ export default function ReproductorAudioguia({
         style={styles.barra}
         onLayout={(e) => setAnchoBarra(e.nativeEvent.layout.width)}
         onPress={(e) => buscar(e.nativeEvent.locationX)}
-        accessibilityRole="adjustable"
-        accessibilityLabel="Posición de la audioguía"
-        accessibilityValue={{
-          text: `${formatearTiempo(actual)} de ${formatearTiempo(total)}`,
-        }}
       >
         <View style={styles.barraFondo} />
         <View style={[styles.barraAvance, { width: `${avance * 100}%` }]} />
@@ -164,24 +211,12 @@ export default function ReproductorAudioguia({
       </View>
 
       <View style={styles.controles}>
-        <Pressable
-          onPress={() => saltar(-SALTO_SEGUNDOS)}
-          style={styles.salto}
-          accessibilityRole="button"
-          accessibilityLabel="Retroceder 15 segundos"
-        >
+        <Pressable onPress={() => saltar(-SALTO_SEGUNDOS)} style={styles.salto}>
           <Ionicons name="play-back" size={18} color="#4F46E5" />
           <Text style={styles.saltoTexto}>15</Text>
         </Pressable>
 
-        <Pressable
-          onPress={fallo ? reintentar : alternar}
-          style={styles.botonPlay}
-          accessibilityRole="button"
-          accessibilityLabel={
-            fallo ? 'Reintentar audioguía' : status.playing ? 'Pausar audioguía' : 'Reproducir audioguía'
-          }
-        >
+        <Pressable onPress={fallo ? reintentar : alternar} style={styles.botonPlay}>
           {cargando ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -189,12 +224,7 @@ export default function ReproductorAudioguia({
           )}
         </Pressable>
 
-        <Pressable
-          onPress={() => saltar(SALTO_SEGUNDOS)}
-          style={styles.salto}
-          accessibilityRole="button"
-          accessibilityLabel="Adelantar 15 segundos"
-        >
+        <Pressable onPress={() => saltar(SALTO_SEGUNDOS)} style={styles.salto}>
           <Ionicons name="play-forward" size={18} color="#4F46E5" />
           <Text style={styles.saltoTexto}>15</Text>
         </Pressable>
@@ -245,19 +275,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   chipOfflineText: { fontSize: 10, fontWeight: '600', color: '#065F46' },
-
   barra: { height: 22, justifyContent: 'center' },
-  barraFondo: {
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#C7D2FE',
-  },
-  barraAvance: {
-    position: 'absolute',
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#4F46E5',
-  },
+  barraFondo: { height: 5, borderRadius: 3, backgroundColor: '#C7D2FE' },
+  barraAvance: { position: 'absolute', height: 5, borderRadius: 3, backgroundColor: '#4F46E5' },
   perilla: {
     position: 'absolute',
     width: 14,
@@ -267,10 +287,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
   },
-
   tiempos: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
   tiempo: { fontSize: 11, color: '#4B5563', fontWeight: '600' },
-
   controles: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -278,8 +296,8 @@ const styles = StyleSheet.create({
     gap: 26,
     marginTop: 2,
   },
-  salto: { alignItems: 'center', justifyContent: 'center', width: 44 },
-  saltoTexto: { fontSize: 10, fontWeight: 'bold', color: '#4F46E5', marginTop: -2 },
+  salto: { alignItems: 'center', justifyContent: 'center', padding: 6 },
+  saltoTexto: { fontSize: 10, fontWeight: '700', color: '#4F46E5', marginTop: -2 },
   botonPlay: {
     width: 54,
     height: 54,
@@ -288,7 +306,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  aviso: { fontSize: 12, color: '#B45309', lineHeight: 17 },
-  ayuda: { fontSize: 11, color: '#6B7280', lineHeight: 16 },
+  aviso: { fontSize: 12, color: '#B45309', textAlign: 'center', marginTop: 4 },
+  ayuda: { fontSize: 11, color: '#6B7280', textAlign: 'center', marginTop: 2 },
 });
