@@ -1,5 +1,5 @@
 // src/servicios/catalogoDb.ts
-// Caché SQLite del catálogo completo de lugares (PRD §7: "catálogo cacheado").
+// Caché SQLite del catálogo completo de lugares (PRD, punto 7: "catálogo cacheado").
 // Archivo propio (catalogo_offline.db) para no chocar con las bases de otros bloques.
 
 import * as SQLite from 'expo-sqlite';

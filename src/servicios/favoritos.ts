@@ -1,5 +1,5 @@
 // src/servicios/favoritos.ts
-// Favoritos de la cuenta. La API los guarda por usuario (PRD §5) y la app los
+// Favoritos de la cuenta. La API los guarda por usuario (PRD, punto 5) y la app los
 // espeja en el teléfono para que sigan estando sin señal.
 import { RespuestaApiExito } from '../tipos';
 import { httpClient } from './client';

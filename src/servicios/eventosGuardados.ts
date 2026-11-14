@@ -1,5 +1,5 @@
 // src/servicios/eventosGuardados.ts
-// Eventos guardados de la cuenta (PRD §3). La API solo acepta guardar eventos
+// Eventos guardados de la cuenta (PRD, punto 3). La API solo acepta guardar eventos
 // programados o suspendidos; si el evento ya terminó responde 422.
 import { Evento, RespuestaApiExito } from '../tipos';
 import { httpClient } from './client';

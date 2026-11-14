@@ -1,7 +1,7 @@
 // app/(tabs)/recorrido.tsx
-// PRD §4 "Mi recorrido": registrar visitas por QR, por cercanía o a mano,
+// PRD, punto 4 "Mi recorrido": registrar visitas por QR, por cercanía o a mano,
 // con foto y nota corta; ver el recorrido completo en orden.
-// PRD §8: respuesta háptica al registrar la visita.
+// PRD, punto 8: respuesta háptica al registrar la visita.
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import * as Haptics from 'expo-haptics';
@@ -378,7 +378,7 @@ export default function RecorridoScreen() {
         onRegistrar={handleRegistrarCercania}
       />
 
-      {/* Modal: nota corta de una visita (PRD §4) */}
+      {/* Modal: nota corta de una visita (PRD, punto 4) */}
       <Modal
         visible={!!notaModal}
         animationType="slide"

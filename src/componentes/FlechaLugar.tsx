@@ -1,7 +1,7 @@
 // src/componentes/FlechaLugar.tsx
-// PRD §2: "Cuando el lugar está lejos y no se ve el cartel, que una flecha
+// PRD, punto 2: "Cuando el lugar está lejos y no se ve el cartel, que una flecha
 // indique para qué lado queda."
-// PRD §8: usa el magnetómetro del teléfono (expo-sensors).
+// PRD, punto 8: usa el magnetómetro del teléfono (expo-sensors).
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import { Magnetometer } from 'expo-sensors';

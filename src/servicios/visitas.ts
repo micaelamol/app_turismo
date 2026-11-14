@@ -1,5 +1,5 @@
 // src/servicios/visitas.ts
-// Visitas de la cuenta. La API las guarda por usuario (PRD §4) y la app las
+// Visitas de la cuenta. La API las guarda por usuario (PRD, punto 4) y la app las
 // espeja en recorrido_offline.db para poder mostrarlas sin señal.
 import { OrigenVisita, RespuestaApiExito, Visita } from '../tipos';
 import { esArchivoLocal, subirArchivo } from './archivos';

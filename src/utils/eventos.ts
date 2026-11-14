@@ -48,7 +48,7 @@ export function formatearHoraEvento(iso: string | null): string {
 
 /**
  * "5 h", "1 h 30 min", "45 min". Devuelve null si falta el fin o no se puede calcular.
- * PRD §3: el detalle del evento dice "cuánto dura".
+ * PRD, punto 3: el detalle del evento dice "cuánto dura".
  */
 export function duracionEvento(inicio: string, fin: string | null): string | null {
   if (!fin) return null;
@@ -97,7 +97,7 @@ export function claveDiaEvento(iso: string | null | undefined): string {
 
 /**
  * "Hoy", "Mañana" o "Sábado 14 de noviembre".
- * PRD §3: "Ver los eventos por día, empezando por hoy."
+ * PRD, punto 3: "Ver los eventos por día, empezando por hoy."
  */
 export function tituloDiaEvento(clave: string, ahora: Date = new Date()): string {
   if (clave === SIN_FECHA) return 'Sin fecha confirmada';
@@ -129,7 +129,7 @@ export function ordenarEventosPorInicio(eventos: CityEvent[]): CityEvent[] {
 
 /**
  * ¿El evento ya terminó?
- * PRD §3: la agenda marca los eventos vencidos y no permite programarles un
+ * PRD, punto 3: la agenda marca los eventos vencidos y no permite programarles un
  * recordatorio, pero no se ocultan ni se cambian sus fechas.
  * - Si el backend lo marcó "finalizado", ya pasó.
  * - Si tiene hora de fin, se compara contra el fin.

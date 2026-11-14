@@ -1,5 +1,5 @@
 // src/hooks/useAvisosProximidad.ts
-// PRD §8: mientras la persona camina, la app mira si pasó cerca de un lugar
+// PRD, punto 8: mientras la persona camina, la app mira si pasó cerca de un lugar
 // y muestra un aviso. Solo uno por lugar y por día, y solo si la cuenta lo
 // tiene activado en Preferencias.
 

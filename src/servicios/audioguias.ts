@@ -1,5 +1,5 @@
 // src/servicios/audioguias.ts
-// Textos de la audioguía. PRD §6: "Escuchar una audioguía mientras recorrés el lugar",
+// Textos de la audioguía. PRD, punto 6: "Escuchar una audioguía mientras recorrés el lugar",
 // con controles de reproducción y tiempo restante.
 
 /** Nombre del archivo de audio dentro de la carpeta de descarga del lugar. */

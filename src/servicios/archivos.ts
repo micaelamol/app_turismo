@@ -1,6 +1,6 @@
 // src/servicios/archivos.ts
 // Subida de fotos a POST /archivos (con sesión, multipart). La API devuelve la
-// URL que después viaja en la visita. AGENTS §8: primero el archivo, después el
+// URL que después viaja en la visita. AGENTS.md, punto 8: primero el archivo, después el
 // recurso; por eso la cola sube la foto recién cuando hay señal.
 import { RespuestaApiExito } from '../tipos';
 import { httpClient } from './client';

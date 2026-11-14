@@ -1,6 +1,6 @@
 // src/utils/lugares.ts
 // Textos de la ficha de un lugar: horarios, precio y si está abierto ahora.
-// PRD §1: "Entrar al detalle de un lugar y ver fotos, la descripción, el horario,
+// PRD, punto 1: "Entrar al detalle de un lugar y ver fotos, la descripción, el horario,
 // el teléfono y cuánto sale entrar."
 
 import { Horario } from '../tipos';

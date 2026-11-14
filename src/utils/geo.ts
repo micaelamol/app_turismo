@@ -1,5 +1,5 @@
 // src/utils/geo.ts
-// Cálculos de distancia y rumbo para el bloque "Recorrido por cercanía" (PRD §2 y §4).
+// Cálculos de distancia y rumbo para el bloque "Recorrido por cercanía" (PRD, puntos 2 y 4).
 // No dependen de ningún contexto ni de la API.
 
 import { Coordinates } from '../tipos';
@@ -20,7 +20,7 @@ function longitud(coords: Coordinates): number {
 
 /**
  * Distancia en metros entre dos coordenadas (fórmula de Haversine).
- * PRD §2: "Una lista de lo que tenés cerca ordenada por distancia."
+ * PRD, punto 2: "Una lista de lo que tenés cerca ordenada por distancia."
  */
 export function distanciaMetros(desde: Coordinates, hasta: Coordinates): number {
   const lat1 = aRadianes(latitud(desde));
@@ -45,7 +45,7 @@ export function formatearDistancia(metros: number): string {
 
 /**
  * Rumbo en grados desde el norte (0 = norte, 90 = este) para ir de `desde` a `hasta`.
- * PRD §2: "que una flecha indique para qué lado queda".
+ * PRD, punto 2: "que una flecha indique para qué lado queda".
  */
 export function rumboHacia(desde: Coordinates, hasta: Coordinates): number {
   const lat1 = aRadianes(latitud(desde));

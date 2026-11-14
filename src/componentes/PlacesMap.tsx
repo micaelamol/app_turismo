@@ -77,7 +77,7 @@ export default function PlacesMap({ places, selectedPlace, onSelect }: Props) {
     >
       {places.map((p) => {
         const isSel = selectedPlace?.id === p.id;
-        // PRD §2: al tocar el marcador se ve el nombre y la distancia.
+        // PRD, punto 2: al tocar el marcador se ve el nombre y la distancia.
         const distancia = formatearDistancia(distanciaMetros(userLocation, p.coordinates));
         return (
           <Marker

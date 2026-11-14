@@ -1,5 +1,5 @@
 // src/servicios/avisosProximidad.ts
-// PRD §8: avisar cuando la persona pasa cerca de un lugar, sin convertir la
+// PRD, punto 8: avisar cuando la persona pasa cerca de un lugar, sin convertir la
 // app en una máquina de notificaciones. Regla: un aviso por lugar y por día.
 // Son notificaciones LOCALES: no usan push ni tokens.
 

@@ -1,5 +1,5 @@
 // src/servicios/visitasDb.ts
-// Base SQLite propia del bloque "Mi recorrido" (PRD §4 y §7).
+// Base SQLite propia del bloque "Mi recorrido" (PRD, puntos 4 y 7).
 // Archivo propio (recorrido_offline.db) para no chocar con las bases de otros bloques.
 //
 // El PRD pide que la visita se guarde primero en el teléfono con sincronizada: false
@@ -113,7 +113,7 @@ export async function listarVisitas(usuarioId: string): Promise<Visita[]> {
   return filas.map(filaAVisita);
 }
 
-/** Visitas de la cuenta que todavía no llegaron al servidor (cola del PRD §7). */
+/** Visitas de la cuenta que todavía no llegaron al servidor (cola del PRD, punto 7). */
 export async function listarVisitasSinSincronizar(usuarioId: string): Promise<Visita[]> {
   await inicializarVisitasDb();
   const db = await abrirBase();

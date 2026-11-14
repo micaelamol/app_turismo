@@ -1,5 +1,5 @@
 // app/preferencias.tsx
-// Preferencias de la cuenta (PRD §5: la cuenta es para guardar cosas).
+// Preferencias de la cuenta (PRD, punto 5: la cuenta es para guardar cosas).
 // Se guardan en el teléfono (kv-store) y, con sesión, también en la API.
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';

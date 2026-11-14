@@ -144,7 +144,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Preferencias de la cuenta (PRD §5) */}
+        {/* Preferencias de la cuenta (PRD, punto 5) */}
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/preferencias')}

@@ -1,6 +1,6 @@
 // src/servicios/catalogo.ts
 // Estrategia "red primero, caché después" para el catálogo de lugares.
-// PRD §7: "si ya abrió la app en el hotel, después pueda seguir viendo
+// PRD, punto 7: "si ya abrió la app en el hotel, después pueda seguir viendo
 // los lugares y su recorrido" sin conexión.
 
 import { Lugar } from '../tipos';

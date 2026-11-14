@@ -1,5 +1,5 @@
 // src/componentes/RegistroCercania.tsx
-// PRD §4: registrar una visita "estando físicamente cerca", con nota corta.
+// PRD, punto 4: registrar una visita "estando físicamente cerca", con nota corta.
 // La lista llega ordenada por distancia desde PlacesContext.
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';
