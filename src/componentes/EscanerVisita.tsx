@@ -37,7 +37,12 @@ export default function EscanerVisita({
   const cameraRef = useRef<CameraView>(null);
   const [place, setPlace] = useState<Place | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [locked, setLocked] = useState(false);
+  // Con un ref la cámara se bloquea al instante: `onBarcodeScanned` puede
+  // dispararse varias veces por segundo antes de que React vuelva a pintar.
+  const lockedRef = useRef(false);
+  // Un QR ajeno puede quedar delante de la cámara: se recuerda el último
+  // código rechazado para no repetir el aviso en loop.
+  const rechazadoRef = useRef<string | null>(null);
   const [choosingPlace, setChoosingPlace] = useState(false);
 
   // Solo para pruebas en desarrollo: código QR del primer lugar que tenga uno
@@ -46,7 +51,8 @@ export default function EscanerVisita({
   const reset = () => {
     setPlace(null);
     setPhotoUri(null);
-    setLocked(false);
+    lockedRef.current = false;
+    rechazadoRef.current = null;
     setChoosingPlace(false);
   };
 
@@ -56,18 +62,20 @@ export default function EscanerVisita({
   };
 
   const handleScan = ({ data }: { data: string }) => {
-    if (locked) return;
-    setLocked(true);
-
     const raw = data.trim();
+    if (lockedRef.current || raw === rechazadoRef.current) return;
+    lockedRef.current = true;
+
     const lastSegment = raw.split('/').filter(Boolean).pop() ?? raw;
     const found = getPlaceByQR(raw) ?? getPlaceByQR(lastSegment);
 
     if (found) {
+      rechazadoRef.current = null;
       setPlace(found);
     } else {
+      rechazadoRef.current = raw;
       Alert.alert('QR no reconocido', 'Este código no corresponde a ningún lugar de la app.', [
-        { text: 'Reintentar', onPress: () => setLocked(false) },
+        { text: 'Reintentar', onPress: () => { lockedRef.current = false; } },
         { text: 'Cerrar', onPress: close },
       ]);
     }
