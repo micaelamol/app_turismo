@@ -2,9 +2,10 @@
 // app/(tabs)/index.tsx
 import { Ionicons } from '@react-native-vector-icons/ionicons'; 
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 import {
+  Alert,
   FlatList,
   ImageBackground,
   ScrollView,
@@ -19,6 +20,12 @@ import FotoLugar from '../../src/componentes/FotoLugar';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
+import { distanciaMetros, formatearDistancia } from '../../src/utils/geo';
+
+// Banner e imperdibles: elegimos lugares que ya tienen foto real subida, para
+// que la portada de la app no muestre la imagen de relleno de la semilla.
+const FOTO_BANNER = ['lug-014', 'lug-004', 'lug-006', 'lug-002'];
+const IMPERDIBLES = ['lug-004', 'lug-006', 'lug-007', 'lug-014', 'lug-018'];
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,14 +40,67 @@ export default function HomeScreen() {
     places,
     isFavorite,
     toggleFavorite,
+    ubicacionActual,
+    actualizarUbicacion,
+    actualizandoUbicacion,
   } = usePlaces();
+  const [ordenarPorCercania, setOrdenarPorCercania] = useState(false);
 
-  // Destacados: si el backend no marca ninguno, se muestran los primeros 5
+  // PRD, punto 1: ordenar por distancia a donde está la persona.
+  // Solo se ordena con la ubicación real del teléfono: sin permiso no se
+  // muestran distancias inventadas.
+  const placesParaMostrar = useMemo(() => {
+    if (!ordenarPorCercania || !ubicacionActual) {
+      return filteredPlaces.map((place: Place) => ({ place, metros: null as number | null }));
+    }
+
+    return filteredPlaces
+      .map((place: Place) => ({
+        place,
+        metros: distanciaMetros(ubicacionActual, place.coordinates),
+      }))
+      .sort((a, b) => a.metros - b.metros);
+  }, [filteredPlaces, ordenarPorCercania, ubicacionActual]);
+
+  const handleCercaMio = async () => {
+    if (ordenarPorCercania) {
+      setOrdenarPorCercania(false);
+      return;
+    }
+
+    if (ubicacionActual) {
+      setOrdenarPorCercania(true);
+      return;
+    }
+
+    if (actualizandoUbicacion) return;
+
+    const coords = await actualizarUbicacion();
+    if (coords) {
+      setOrdenarPorCercania(true);
+    } else {
+      Alert.alert(
+        'Sin ubicación',
+        'Para ordenar por cercanía necesitamos tu ubicación. Podés habilitarla en los ajustes del teléfono.'
+      );
+    }
+  };
+
+  // Destacados: si el backend no marca ninguno, usamos una selección curada
+  // de lugares con foto real. Si no alcanza, caemos a los primeros.
   const marcados = places.filter((p: Place) => p.isFeatured);
-  const featuredPlaces = marcados.length > 0 ? marcados : places.slice(0, 5);
+  const curados = IMPERDIBLES.map((id) => places.find((p: Place) => p.id === id)).filter(
+    (p): p is Place => Boolean(p)
+  );
+  const featuredPlaces =
+    marcados.length > 0 ? marcados : curados.length >= 3 ? curados : places.slice(0, 5);
 
-  // Imagen del banner: la del primer lugar que venga de la API
-  const heroUri = places[0]?.imageUrl || undefined;
+  // Imagen del banner: la primera foto real de la lista curada.
+  const heroPlace =
+    FOTO_BANNER.map((id) => places.find((p: Place) => p.id === id)).find(Boolean) ??
+    places.find((p: Place) => p.imageUrl && !p.imageUrl.includes('semilla-')) ??
+    places[0];
+  const heroUri = heroPlace?.imageUrl || undefined;
 
   const goToDetail = (id: string) => {
     router.push(`/place/${id}`);
@@ -106,7 +166,7 @@ export default function HomeScreen() {
     </TouchableOpacity>
   );
 
-  const renderPlaceCard = (item: Place) => (
+  const renderPlaceCard = (item: Place, metros: number | null = null) => (
     <TouchableOpacity
       key={item.id}
       style={styles.placeCard}
@@ -122,31 +182,12 @@ export default function HomeScreen() {
       <View style={styles.placeCardInfo}>
         <View style={styles.placeCardHeader}>
           <Text style={styles.placeCategoryTag}>{item.category.toUpperCase()}</Text>
-          <View style={styles.ratingBox}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Ionicons
-                key={star}
-                name={
-                  item.rating >= star
-                    ? 'star'
-                    : item.rating >= star - 0.5
-                    ? 'star-half'
-                    : 'star-outline'
-                }
-                size={13}
-                color="#F59E0B"
-              />
-            ))}
-            <Text style={styles.ratingText}>
-              {item.ratingCount > 0 ? `${item.rating.toFixed(1)} (${item.ratingCount})` : '0.0'}
-            </Text>
-          </View>
         </View>
         <Text style={styles.placeCardTitle} numberOfLines={1}>
           {item.title}
         </Text>
         <Text style={styles.placeCardDescription} numberOfLines={2}>
-          {item.description}
+          {item.descripcionCorta || item.description}
         </Text>
         <View style={styles.placeCardFooter}>
           <View style={styles.locationContainer}>
@@ -154,6 +195,9 @@ export default function HomeScreen() {
             <Text style={styles.locationText} numberOfLines={1}>
               {item.address}
             </Text>
+            {metros != null && (
+              <Text style={styles.distanceText}>{formatearDistancia(metros)}</Text>
+            )}
           </View>
           <TouchableOpacity onPress={() => toggleFavorite(item.id)}>
             <Ionicons
@@ -177,6 +221,7 @@ export default function HomeScreen() {
           imageStyle={styles.heroBannerImage}
         >
           <View style={styles.heroOverlay}>
+            <View style={styles.heroBottomShade} pointerEvents="none" />
             <View style={styles.heroTopRow}>
               <View style={styles.locationTag}>
                 <Ionicons name="sunny" size={14} color="#F59E0B" />
@@ -236,10 +281,7 @@ export default function HomeScreen() {
           {/* Imperdibles */}
           {!searchQuery && selectedCategory === 'all' && (
             <View style={styles.section}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Imperdibles de Colón</Text>
-                <Text style={styles.seeAllText}>Top Valorados</Text>
-              </View>
+              <Text style={styles.sectionTitle}>Imperdibles de Colón</Text>
               <FlatList
                 data={featuredPlaces}
                 renderItem={renderFeaturedItem}
@@ -253,9 +295,30 @@ export default function HomeScreen() {
 
           {/* Destinos Turísticos Filtrados */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Destinos Turísticos</Text>
-            {filteredPlaces.length > 0 ? (
-              filteredPlaces.map((place) => renderPlaceCard(place))
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitleInline}>Destinos Turísticos</Text>
+              <TouchableOpacity
+                style={[styles.nearbyChip, ordenarPorCercania && styles.nearbyChipActive]}
+                onPress={handleCercaMio}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  ordenarPorCercania ? 'Quitar el orden por cercanía' : 'Ordenar por cercanía'
+                }
+              >
+                <Ionicons
+                  name="navigate-outline"
+                  size={14}
+                  color={ordenarPorCercania ? '#fff' : '#4F46E5'}
+                />
+                <Text
+                  style={[styles.nearbyChipText, ordenarPorCercania && styles.nearbyChipTextActive]}
+                >
+                  Cerca mío
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {placesParaMostrar.length > 0 ? (
+              placesParaMostrar.map(({ place, metros }) => renderPlaceCard(place, metros))
             ) : (
               <View style={styles.noResultsBox}>
                 <Text style={styles.noResultsText}>No se encontraron lugares.</Text>
@@ -271,25 +334,32 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
   scrollContent: { paddingBottom: 24 },
-  heroBanner: { height: 220, width: '100%' },
+  // El fondo oscuro es el respaldo cuando no hay foto (por ejemplo, al abrir
+  // la app con la semilla del profe): así el texto blanco siempre se lee.
+  heroBanner: { minHeight: 220, width: '100%', backgroundColor: '#1F2937' },
   heroBannerImage: { resizeMode: 'cover' },
   heroOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', padding: 16, justifyContent: 'space-between' },
+  heroBottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%', backgroundColor: 'rgba(0,0,0,0.28)' },
   heroTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   locationTag: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignItems: 'center' },
   locationTagText: { fontSize: 10, fontWeight: 'bold', color: '#1F2937', marginLeft: 4 },
   roleChip: { backgroundColor: '#4F46E5', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   roleChipText: { fontSize: 10, fontWeight: 'bold', color: '#fff' },
   heroTexts: { marginBottom: 8 },
-  heroGreeting: { fontSize: 16, color: '#E5E7EB' },
-  heroTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 2 },
-  heroSubtitle: { fontSize: 12, color: '#D1D5DB', marginTop: 2 },
+  heroGreeting: { fontSize: 16, color: '#E5E7EB', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  heroTitle: { fontSize: 24, fontWeight: 'bold', color: '#fff', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  heroSubtitle: { fontSize: 12, color: '#D1D5DB', marginTop: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   bodyContent: { paddingHorizontal: 16, marginTop: -20, backgroundColor: '#F9FAFB', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 20 },
-  searchBar: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 12, height: 48, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  searchBar: { flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 12, minHeight: 48, borderRadius: 16, alignItems: 'center', marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   searchInput: { flex: 1, fontSize: 14, color: '#1F2937' },
   section: { marginBottom: 24 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1F2937', marginBottom: 12 },
-  seeAllText: { fontSize: 12, color: '#4F46E5', fontWeight: '600' },
+  sectionTitleInline: { fontSize: 18, fontWeight: 'bold', color: '#1F2937' },
+  nearbyChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#4F46E5', backgroundColor: '#fff' },
+  nearbyChipActive: { backgroundColor: '#4F46E5' },
+  nearbyChipText: { fontSize: 12, color: '#4F46E5', fontWeight: '600' },
+  nearbyChipTextActive: { color: '#fff' },
   categoriesList: { paddingRight: 16 },
   categoryChip: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8, backgroundColor: '#fff', alignItems: 'center' },
   categoryChipText: { fontSize: 13, color: '#4B5563', fontWeight: '500' },
@@ -305,18 +375,17 @@ const styles = StyleSheet.create({
   featuredTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
   featuredRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   featuredLocation: { fontSize: 11, color: '#E5E7EB', marginLeft: 4, flex: 1 },
-  placeCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#E5E7EB' },
-  placeCardImage: { width: '100%', height: 150 },
+  placeCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  placeCardImage: { width: '100%', height: 150, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   placeCardInfo: { padding: 12 },
-  placeCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  placeCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   placeCategoryTag: { fontSize: 10, fontWeight: 'bold', color: '#6B7280' },
-  ratingBox: { flexDirection: 'row', alignItems: 'center' },
-  ratingText: { fontSize: 11, color: '#4B5563', marginLeft: 4, fontWeight: '500' },
   placeCardTitle: { fontSize: 16, fontWeight: 'bold', color: '#1F2937' },
   placeCardDescription: { fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 18 },
   placeCardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   locationContainer: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 16 },
   locationText: { fontSize: 12, color: '#6B7280', marginLeft: 4, flex: 1 },
+  distanceText: { fontSize: 12, color: '#4F46E5', fontWeight: '600', marginLeft: 6 },
   noResultsBox: { padding: 32, alignItems: 'center', justifyContent: 'center' },
   noResultsText: { fontSize: 14, color: '#9CA3AF', fontWeight: '500' }
 });

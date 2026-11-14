@@ -5,7 +5,7 @@ import * as Network from 'expo-network';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { obtenerCategorias } from '../servicios/categories';
-import { cargarCatalogo, refrescarCatalogo } from '../servicios/catalogo';
+import { cargarCatalogo, OrigenCatalogo, refrescarCatalogo } from '../servicios/catalogo';
 import { obtenerEventos } from '../servicios/events';
 import { agregarFavorito, obtenerFavoritos, quitarFavorito } from '../servicios/favoritos';
 import {
@@ -100,7 +100,7 @@ interface PlacesContextType {
   cargando: boolean;
   error: string | null;
 
-  // PRD §4: el recorrido son visitas reales (origen, fecha, foto, nota, sincronizada)
+  // PRD, punto 4: el recorrido son visitas reales (origen, fecha, foto, nota, sincronizada)
   visitas: Visita[];
   registrarVisita: (lugarId: string, opciones?: OpcionesVisita) => Promise<Visita>;
   actualizarNotaVisita: (visitaId: string, nota: string) => Promise<void>;
@@ -110,17 +110,17 @@ interface PlacesContextType {
   visitasHuerfanas: Visita[];
   limpiarVisitasHuerfanas: () => Promise<void>;
 
-  // PRD §2 y §4: ubicación real del teléfono y "lo que tenés cerca"
+  // PRD, puntos 2 y 4: ubicación real del teléfono y "lo que tenés cerca"
   ubicacionActual: Coordinates | null;
   permisoUbicacion: PermisoUbicacion;
   actualizandoUbicacion: boolean;
   actualizarUbicacion: () => Promise<Coordinates | null>;
   lugaresCercanos: LugarCercano[];
 
-  // PRD §7: catálogo completo guardado en el teléfono
+  // PRD, punto 7: catálogo completo guardado en el teléfono
   catalogoOffline: boolean;
   catalogoActualizadoEn: string | null;
-  actualizarCatalogo: () => Promise<void>;
+  actualizarCatalogo: () => Promise<OrigenCatalogo>;
 }
 
 const PlacesContext = createContext<PlacesContextType | undefined>(undefined);
@@ -142,15 +142,15 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [userRatings, setUserRatings] = useState<Record<string, number>>({});
   const [eventReminders, setEventReminders] = useState<string[]>([]);
 
-  // PRD §4: el recorrido son visitas reales, no una lista de IDs sueltos.
+  // PRD, punto 4: el recorrido son visitas reales, no una lista de IDs sueltos.
   const [visitas, setVisitas] = useState<Visita[]>([]);
 
-  // PRD §2/§4: ubicación real del teléfono.
+  // PRD, puntos 2 y 4: ubicación real del teléfono.
   const [ubicacionActual, setUbicacionActual] = useState<Coordinates | null>(null);
   const [permisoUbicacion, setPermisoUbicacion] = useState<PermisoUbicacion>('desconocido');
   const [actualizandoUbicacion, setActualizandoUbicacion] = useState<boolean>(false);
 
-  // PRD §7: catálogo completo disponible sin conexión.
+  // PRD, punto 7: catálogo completo disponible sin conexión.
   const [catalogoOffline, setCatalogoOffline] = useState<boolean>(false);
   const [catalogoActualizadoEn, setCatalogoActualizadoEn] = useState<string | null>(null);
 
@@ -163,7 +163,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setError(null);
 
         // Primero el catálogo: si no hay red, `cargarCatalogo` devuelve la
-        // copia guardada en SQLite (PRD §7).
+        // copia guardada en SQLite (PRD, punto 7).
         const catalogo = await cargarCatalogo();
         if (!montado) return;
 
@@ -189,7 +189,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           console.warn('No se pudieron cargar los eventos', resEventos.reason);
         }
 
-        // Aviso de red (PRD §7): catálogo local o eventos sin actualizar.
+        // Aviso de red (PRD, punto 7): catálogo local o eventos sin actualizar.
         if (catalogo.origen === 'cache' || resEventos.status === 'rejected') {
           setError('Sin conexión: estás viendo los datos guardados en el teléfono.');
         }
@@ -224,7 +224,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .catch((e) => console.warn('No se pudo subir la cola de visitas', e));
   };
 
-  // PRD §4/§7: cargar la cola local de visitas del usuario actual.
+  // PRD, puntos 4 y 7: cargar la cola local de visitas del usuario actual.
   const recargarVisitas = async (): Promise<void> => {
     try {
       await inicializarVisitasDb();
@@ -252,7 +252,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuarioId]);
 
-  // Favoritos guardados en el teléfono, separados por cuenta (PRD §3 y §5).
+  // Favoritos guardados en el teléfono, separados por cuenta (PRD, puntos 3 y 5).
   // Al entrar, lo marcado como invitado y lo que ya tenía la cuenta en el
   // servidor se suman a la copia local.
   useEffect(() => {
@@ -306,7 +306,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
 
         // Lo marcado como invitado (o lo que quedó solo en este teléfono) viaja
-        // a la cuenta: si no, se pierde al cambiar de teléfono (PRD §5).
+        // a la cuenta: si no, se pierde al cambiar de teléfono (PRD, punto 5).
         if (delServidor) {
           const faltan = unidos.filter((id) => !delServidor!.includes(id));
           await Promise.allSettled(faltan.map((id) => agregarFavorito(id)));
@@ -326,7 +326,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, [usuarioId]);
 
-  // PRD §4: las visitas de la cuenta también viven en el servidor. Al entrar se
+  // PRD, punto 4: las visitas de la cuenta también viven en el servidor. Al entrar se
   // bajan y se copian a recorrido_offline.db, así el recorrido arranca con datos
   // aunque después se corte la señal.
   useEffect(() => {
@@ -364,7 +364,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // PRD §7: cuando vuelve la señal, se sube lo que quedó en la cola.
+  // PRD, punto 7: cuando vuelve la señal, se sube lo que quedó en la cola.
   useEffect(() => {
     if (usuarioId === 'local') return;
 
@@ -393,7 +393,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   /**
    * Registra una visita del PRD: origen (qr/gps/manual), foto, nota y
-   * sincronizada: false. Se guarda primero en el teléfono (PRD §7).
+   * sincronizada: false. Se guarda primero en el teléfono (PRD, punto 7).
    */
   const registrarVisita = async (
     lugarId: string,
@@ -428,7 +428,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       nota: opciones.nota?.trim() ? opciones.nota.trim() : null,
       sincronizada: false,
       // Copia del lugar: el recorrido no pierde el nombre si el lugar
-      // se da de baja o si la app se abre sin conexión (PRD §7).
+      // se da de baja o si la app se abre sin conexión (PRD, punto 7).
       lugarNombre: lugar?.nombre ?? null,
       lugarImagen: lugar?.imagenes?.[0] ?? null,
     };
@@ -599,7 +599,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  /** Pide permiso y devuelve la posición real del teléfono (PRD §2 y §4). */
+  /** Pide permiso y devuelve la posición real del teléfono (PRD, puntos 2 y 4). */
   const actualizarUbicacion = async (): Promise<Coordinates | null> => {
     setActualizandoUbicacion(true);
     try {
@@ -631,15 +631,17 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   /** Vuelve a bajar el catálogo completo y lo guarda para uso offline. */
-  const actualizarCatalogo = async (): Promise<void> => {
+  const actualizarCatalogo = async (): Promise<OrigenCatalogo> => {
     try {
       const catalogo = await refrescarCatalogo();
       setRawPlaces(catalogo.datos);
       setCatalogoOffline(catalogo.origen === 'cache');
       setCatalogoActualizadoEn(catalogo.actualizadoEn);
       if (catalogo.origen === 'red') setError(null);
+      return catalogo.origen;
     } catch (e: any) {
       setError(e?.message || 'No se pudo actualizar el catálogo');
+      throw e;
     }
   };
 
@@ -686,7 +688,7 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   });
 
-  // PRD §2: "una lista de lo que tenés cerca ordenada por distancia".
+  // PRD, punto 2: "una lista de lo que tenés cerca ordenada por distancia".
   const lugaresCercanos: LugarCercano[] = ubicacionActual
     ? places
         .map((lugar) => ({
@@ -729,13 +731,13 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setFavorites(siguiente);
 
-    // Los favoritos tienen que sobrevivir a cerrar la app (PRD §3), pero cada
+    // Los favoritos tienen que sobrevivir a cerrar la app (PRD, punto 3), pero cada
     // cuenta (y el invitado) guarda los suyos.
     AsyncStorage.setItem(claveFavoritos(usuarioId), JSON.stringify(siguiente)).catch((e) =>
       console.warn('No se pudieron guardar los favoritos', e)
     );
 
-    // Con sesión, el servidor también se entera (PRD §5).
+    // Con sesión, el servidor también se entera (PRD, punto 5).
     if (user) {
       const pedido = yaEstaba ? quitarFavorito(placeId) : agregarFavorito(placeId);
       pedido.catch((e) => console.warn('No se pudo sincronizar el favorito', e));
@@ -784,6 +786,8 @@ export const PlacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       textoNormalizado === '' ||
       (place.title && place.title.toLowerCase().includes(textoNormalizado)) ||
       (place.nombre && place.nombre.toLowerCase().includes(textoNormalizado)) ||
+      (place.descripcionCorta &&
+        place.descripcionCorta.toLowerCase().includes(textoNormalizado)) ||
       (place.description && place.description.toLowerCase().includes(textoNormalizado)) ||
       (place.descripcion && place.descripcion.toLowerCase().includes(textoNormalizado));
 
