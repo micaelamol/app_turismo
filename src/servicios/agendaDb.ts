@@ -222,6 +222,23 @@ export async function actualizarNotificacionEvento(
   );
 }
 
+/**
+ * Actualiza el estado de un evento ya guardado (por ejemplo, cuando la
+ * Municipalidad lo pasa a cancelado o suspendido después de guardarlo).
+ */
+export async function actualizarEstadoEvento(
+  id: string,
+  estado: EstadoEvento,
+  usuarioId: string
+): Promise<void> {
+  await inicializarAgendaDb();
+  const db = await abrirBase();
+  await db.runAsync(
+    'UPDATE eventos_guardados SET estado = ? WHERE id = ? AND usuario_id = ?;',
+    [estado, id, usuarioId]
+  );
+}
+
 export async function eliminarEventoDeDb(id: string, usuarioId: string): Promise<void> {
   await inicializarAgendaDb();
   const db = await abrirBase();

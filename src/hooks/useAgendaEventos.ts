@@ -7,6 +7,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   EventoGuardado,
+  actualizarEstadoEvento,
+  actualizarNotificacionEvento,
   adoptarEventosLocales,
   eliminarEventoDeDb,
   guardarEventoEnDb,
@@ -58,7 +60,7 @@ export function useAgendaEventos() {
     }, [recargar])
   );
 
-  // PRD §3: los eventos guardados de la cuenta están en el servidor. Al entrar
+  // PRD, punto 3: los eventos guardados de la cuenta están en el servidor. Al entrar
   // se bajan y se suman a los que ya había en el teléfono. Lo que se guardó sin
   // cuenta pasa a ser de la cuenta que acaba de entrar.
   useEffect(() => {
@@ -82,7 +84,7 @@ export function useAgendaEventos() {
           }
 
           // Lo guardado sin cuenta (o sin señal) viaja a la cuenta, para que no
-          // se pierda al cambiar de teléfono (PRD §5).
+          // se pierda al cambiar de teléfono (PRD, punto 5).
           const enServidor = new Set(delServidor.map((evento) => evento.id));
           for (const evento of locales) {
             if (!enServidor.has(evento.id)) {
@@ -194,6 +196,54 @@ export function useAgendaEventos() {
     [eventosGuardados, recargar, user, usuarioId]
   );
 
+  /**
+   * Compara los eventos guardados contra los que trae la API y devuelve los
+   * que cambiaron a cancelado o suspendido después de guardarlos.
+   * Si se canceló, también se saca el recordatorio. El estado nuevo queda
+   * guardado en el teléfono, así el aviso se muestra una sola vez.
+   */
+  const revisarCambiosDeEstado = useCallback(
+    async (eventosActuales: CityEvent[]): Promise<EventoGuardado[]> => {
+      if (eventosActuales.length === 0 || eventosGuardados.length === 0) return [];
+
+      const cambios: EventoGuardado[] = [];
+
+      for (const guardado of eventosGuardados) {
+        const actual = eventosActuales.find((evento) => evento.id === guardado.id);
+        if (!actual) continue;
+
+        const estadoActual = actual.estado ?? 'programado';
+        const seCanceloOSuspendio =
+          estadoActual === 'cancelado' || estadoActual === 'suspendido';
+
+        if (!seCanceloOSuspendio || guardado.estado === estadoActual) continue;
+
+        try {
+          // Un evento cancelado ya no se va a hacer: se saca el aviso.
+          // Si solo quedó suspendido, el recordatorio se mantiene.
+          if (estadoActual === 'cancelado') {
+            await cancelarRecordatorio(guardado.notificacionId);
+            await actualizarNotificacionEvento(guardado.id, null, usuarioId);
+          }
+
+          await actualizarEstadoEvento(guardado.id, estadoActual, usuarioId);
+          cambios.push({
+            ...guardado,
+            estado: estadoActual,
+            notificacionId: estadoActual === 'cancelado' ? null : guardado.notificacionId,
+          });
+        } catch (error) {
+          console.warn('No se pudo actualizar el estado del evento guardado', error);
+        }
+      }
+
+      if (cambios.length > 0) await recargar();
+
+      return cambios;
+    },
+    [eventosGuardados, recargar, usuarioId]
+  );
+
   return {
     eventosGuardados,
     cargandoAgenda,
@@ -202,6 +252,7 @@ export function useAgendaEventos() {
     tieneRecordatorio,
     guardarEvento,
     quitarEvento,
+    revisarCambiosDeEstado,
     recargar,
   };
 }

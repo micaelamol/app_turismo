@@ -1,7 +1,7 @@
 // app/(tabs)/agenda.tsx
 import { Ionicons } from '@react-native-vector-icons/ionicons'; // Requisito estricto de la cátedra
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,9 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { useAgendaEventos } from '../../src/hooks/useAgendaEventos';
 import { eventoGuardadoAEvento } from '../../src/servicios/agendaDb';
+import { obtenerEventos } from '../../src/servicios/events';
 import { CityEvent } from '../../src/tipos';
 import {
   claveDiaEvento,
+  colorEstadoEvento,
+  etiquetaEstadoEvento,
   eventoYaPaso,
   ordenarEventosPorInicio,
   tituloDiaEvento,
@@ -46,9 +49,59 @@ function ImagenEvento({ uri }: { uri: string | null }) {
 export default function EventsScreen() {
   const router = useRouter();
   const { events, cargando, error } = usePlaces();
-  const { eventosGuardados, estaGuardado, guardarEvento, quitarEvento } = useAgendaEventos();
+  const {
+    eventosGuardados,
+    estaGuardado,
+    tieneRecordatorio,
+    guardarEvento,
+    quitarEvento,
+    revisarCambiosDeEstado,
+  } = useAgendaEventos();
   const [selectedFilter] = useState('all');
   const [vista, setVista] = useState<'todos' | 'guardados'>('todos');
+  const revisandoRef = useRef(false);
+
+  // PRD, punto 3: si un evento que guardaste se cancela o se suspende, te
+  // enterás al entrar a la agenda. El aviso se muestra una sola vez.
+  useEffect(() => {
+    if (cargando || eventosGuardados.length === 0) return;
+    if (revisandoRef.current) return;
+
+    revisandoRef.current = true;
+
+    (async () => {
+      try {
+        // Preguntamos a la API en este momento: el listado en memoria se cargó
+        // al abrir la app y puede tener el estado viejo. Si no hay red,
+        // comparamos con lo que ya tenemos.
+        let eventosActuales = events;
+        try {
+          const respuesta = await obtenerEventos();
+          eventosActuales = respuesta.datos;
+        } catch (error) {
+          console.warn('No se pudieron refrescar los eventos', error);
+        }
+
+        const cambios = await revisarCambiosDeEstado(eventosActuales);
+        if (cambios.length === 0) return;
+
+        const detalle = cambios
+          .map((evento) =>
+            evento.estado === 'cancelado'
+              ? `• ${evento.titulo}: se canceló`
+              : `• ${evento.titulo}: quedó suspendido`
+          )
+          .join('\n');
+
+        Alert.alert(
+          'Cambios en tu agenda',
+          `Estos eventos que guardaste cambiaron:\n\n${detalle}`
+        );
+      } finally {
+        revisandoRef.current = false;
+      }
+    })();
+  }, [cargando, events, eventosGuardados.length, revisarCambiosDeEstado]);
 
   const eventosGuardadosComoEventos = eventosGuardados.map(eventoGuardadoAEvento);
 
@@ -69,7 +122,7 @@ export default function EventsScreen() {
       ? eventosBase
       : eventosBase.filter((e: CityEvent) => e.category === selectedFilter);
 
-  // PRD §3: "Ver los eventos por día, empezando por hoy."
+  // PRD, punto 3: "Ver los eventos por día, empezando por hoy."
   const secciones = useMemo(() => {
     const porDia = new Map<string, CityEvent[]>();
 
@@ -109,6 +162,7 @@ export default function EventsScreen() {
 
   const renderEventCard = ({ item }: { item: CityEvent }) => {
     const isReminded = estaGuardado(item.id);
+    const tieneAviso = tieneRecordatorio(item.id);
     // Los eventos vencidos se siguen mostrando, pero marcados y sin recordatorio.
     const yaPaso = eventoYaPaso(item);
 
@@ -166,6 +220,13 @@ export default function EventsScreen() {
               <Text style={styles.eventTitle}>{titulo}</Text>
               <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </View>
+
+            {(item.estado === 'cancelado' || item.estado === 'suspendido') && (
+              <View style={[styles.stateTag, { backgroundColor: colorEstadoEvento(item.estado) }]}>
+                <Ionicons name="alert-circle-outline" size={12} color="#fff" />
+                <Text style={styles.stateTagText}>{etiquetaEstadoEvento(item.estado)}</Text>
+              </View>
+            )}
 
             {fechaTexto && (
               <View style={styles.metaRow}>
@@ -225,7 +286,11 @@ export default function EventsScreen() {
                 color={isReminded ? '#fff' : '#4F46E5'}
               />
               <Text style={[styles.remindText, isReminded && styles.remindTextActive]}>
-                {isReminded ? '✓ Recordatorio Activado' : 'Recordarme este evento'}
+                {!isReminded
+                  ? 'Recordarme este evento'
+                  : tieneAviso
+                  ? '✓ Recordatorio Activado'
+                  : 'Guardado en mi agenda'}
               </Text>
             </TouchableOpacity>
           )}
@@ -433,6 +498,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   pastTagText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  stateTag: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  stateTagText: {
     color: '#fff',
     fontSize: 11,
     fontWeight: 'bold',
