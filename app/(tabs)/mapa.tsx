@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PlacesMap from '../../src/componentes/PlacesMap';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { Place } from '../../src/types';
+import { elegirComoLlegar } from '../../src/utils/comoLlegar';
 import { distanciaMetros, formatearDistancia } from '../../src/utils/geo';
 
 export default function MapScreen() {
@@ -28,7 +28,7 @@ export default function MapScreen() {
   } = usePlaces();
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(filteredPlaces[0] || null);
 
-  // PRD §2: "una lista de lo que tenés cerca ordenada por distancia".
+  // PRD, punto 2: "una lista de lo que tenés cerca ordenada por distancia".
   // El servidor no manda la distancia, así que se calcula en el teléfono.
   const cercanos = React.useMemo(
     () =>
@@ -56,10 +56,7 @@ export default function MapScreen() {
 
   const handleOpenGoogleMaps = (place: Place) => {
     const { latitude, longitude } = place.coordinates;
-    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-    Linking.openURL(url).catch((err) => {
-      console.error('Error abriendo mapa:', err);
-    });
+    elegirComoLlegar(`${latitude},${longitude}`);
   };
 
   return (

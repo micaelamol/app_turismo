@@ -28,6 +28,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { usePlaces } from '../../src/context/PlacesContext';
 import { useDescargas } from '../../src/hooks/useDescargas';
 import { obtenerAudioguiaLocal, estimarPesoBytes, formatearBytes, NivelDescarga } from '../../src/servicios/descargas';
+import { elegirComoLlegar } from '../../src/utils/comoLlegar';
 import { estadoApertura, formatearHorarios, precioLegible } from '../../src/utils/lugares';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -99,12 +100,12 @@ export default function PlaceDetailScreen() {
 
   const isVisited = visitedPlaces.includes(place.id);
 
-  // PRD §6: audioguía del lugar. Si ya se descargó, se reproduce el archivo local.
+  // PRD, punto 6: audioguía del lugar. Si ya se descargó, se reproduce el archivo local.
   const audioguia = place.audioguia ?? null;
   const audioLocal = obtenerAudioguiaLocal(place.id);
   const audioUrl: string | null = audioguia?.url ? audioLocal ?? audioguia.url : null;
 
-  // PRD §1: el detalle muestra horario, teléfono y precio de entrada.
+  // PRD, punto 1: el detalle muestra horario, teléfono y precio de entrada.
   const horariosTexto = formatearHorarios(place.horarios);
   const apertura = estadoApertura(place.horarios);
   const precio = precioLegible(place.precioEntrada);
@@ -127,7 +128,7 @@ export default function PlaceDetailScreen() {
   const handleToggleVisited = () => {
     const ahoraVisitado = toggleVisited(place.id);
     if (ahoraVisitado) {
-      // PRD §8: respuesta háptica al registrar una visita.
+      // PRD, punto 8: respuesta háptica al registrar una visita.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       Alert.alert(
         '¡Visita Registrada! 🎉',
@@ -176,13 +177,10 @@ export default function PlaceDetailScreen() {
 
   const handleOpenGoogleMaps = () => {
     const { latitude, longitude } = place.coordinates;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    Linking.openURL(url).catch((err) => {
-      console.error('Error abriendo mapa:', err);
-    });
+    elegirComoLlegar(`${latitude},${longitude}`);
   };
 
-  // PRD §2: la flecha necesita la ubicación real del teléfono.
+  // PRD, punto 2: la flecha necesita la ubicación real del teléfono.
   const handleUbicacion = async () => {
     const coords = await actualizarUbicacion();
     if (!coords) {
@@ -313,10 +311,6 @@ export default function PlaceDetailScreen() {
                   : 'Sin puntaje aún'}
               </Text>
             </View>
-            <View style={styles.visitBadge}>
-              <Ionicons name="eye-outline" size={14} color="#6B7280" />
-              <Text style={styles.visitBadgeText}>{place.visitCount ?? 0} visitas</Text>
-            </View>
           </View>
 
           <Text style={styles.title}>{place.title}</Text>
@@ -326,7 +320,7 @@ export default function PlaceDetailScreen() {
             <Text style={styles.addressText}>{place.address}</Text>
           </View>
 
-          {/* Información: horario, entrada, teléfono, web y accesibilidad (PRD §1) */}
+          {/* Información: horario, entrada, teléfono, web y accesibilidad (PRD, punto 1) */}
           <View style={styles.infoCard}>
             <Text style={styles.infoTitle}>Información</Text>
 
@@ -410,7 +404,7 @@ export default function PlaceDetailScreen() {
             </View>
           </View>
 
-          {/* PRD §2: flecha con brújula cuando el lugar no se ve */}
+          {/* PRD, punto 2: flecha con brújula cuando el lugar no se ve */}
           {ubicacionActual && (
             <FlechaLugar origen={ubicacionActual} destino={place.coordinates} />
           )}
@@ -477,7 +471,7 @@ export default function PlaceDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* PRD §2: distancia y flecha hacia el lugar */}
+          {/* PRD, punto 2: distancia y flecha hacia el lugar */}
           {!ubicacionActual && (
             <TouchableOpacity
               style={styles.btnUbicacion}
@@ -588,7 +582,7 @@ export default function PlaceDetailScreen() {
           <Text style={styles.sectionTitle}>Acerca de este lugar</Text>
           <Text style={styles.description}>{place.description}</Text>
 
-          {/* Audioguía (PRD §6) */}
+          {/* Audioguía (PRD, punto 6) */}
           {audioguia && audioUrl && (
             <ReproductorAudioguia
               key={audioUrl}
@@ -872,8 +866,6 @@ const styles = StyleSheet.create({
   categoryBadgeText: { fontSize: 10, fontWeight: 'bold', color: '#4F46E5' },
   ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   ratingBadgeText: { fontSize: 12, color: '#6B7280', marginLeft: 4 },
-  visitBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  visitBadgeText: { fontSize: 12, color: '#6B7280' },
   title: { fontSize: 26, fontWeight: 'bold', color: '#111827' },
   addressRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   addressText: { fontSize: 14, color: '#4B5563', flex: 1 },

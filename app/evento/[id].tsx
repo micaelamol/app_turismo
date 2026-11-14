@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +21,7 @@ import { useAgendaEventos } from '../../src/hooks/useAgendaEventos';
 import { eventoGuardadoAEvento, obtenerEventoGuardado } from '../../src/servicios/agendaDb';
 import { obtenerEventoPorId } from '../../src/servicios/events';
 import { CityEvent } from '../../src/tipos';
+import { elegirComoLlegar } from '../../src/utils/comoLlegar';
 import {
   colorEstadoEvento,
   descripcionEvento,
@@ -96,11 +96,10 @@ export default function EventoDetailScreen() {
     };
   }, [eventoId]);
 
-    const abrirComoLlegar = async () => {
+  const abrirComoLlegar = () => {
     if (!evento) return;
 
     const ev = evento as any;
-    console.log('DATOS DEL EVENTO AL ABRIR MAPA:', JSON.stringify(ev, null, 2));
 
     // Soporta lugarId, lugar_id o si el backend ya trae el objeto lugar anidado
     const idLugar = ev.lugarId ?? ev.lugar_id ?? ev.lugar?.id;
@@ -132,21 +131,13 @@ export default function EventoDetailScreen() {
     if (lat != null && lng != null) {
       destino = `${lat},${lng}`;
     } else if (textoDireccion) {
-      destino = encodeURIComponent(`${textoDireccion}, Colón, Entre Ríos, Argentina`);
+      destino = `${textoDireccion}, Colón, Entre Ríos, Argentina`;
     } else {
       Alert.alert('Sin ubicación', 'Este evento aún no tiene una dirección cargada.');
       return;
     }
 
-    const dominio = 'https://google.com';
-    const ruta = '/maps/dir/?api=1&destination=';
-    const url = dominio + ruta + destino;
-
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('No pudimos abrir el mapa', 'Probá buscando el lugar manualmente en tu app de mapas.');
-    }
+    elegirComoLlegar(destino);
   };
 
 
