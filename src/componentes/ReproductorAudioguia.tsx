@@ -1,5 +1,5 @@
 // src/componentes/ReproductorAudioguia.tsx
-// PRD §6: audioguía con play/pausa, adelantar/retroceder, barra de posición,
+// PRD, punto 6: audioguía con play/pausa, adelantar/retroceder, barra de posición,
 // tiempo restante, reproducción en segundo plano y audio local si está descargado.
 
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -20,16 +20,25 @@ interface Props {
 const SALTO_SEGUNDOS = 15;
 const ESPERA_MAXIMA_MS = 8000;
 
+// Misma dirección que usa el resto de la app para hablar con la API.
+const HOST_POR_DEFECTO = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL || HOST_POR_DEFECTO).replace(/\/+$/, '');
+
 function resolverUrlEnDispositivo(rawUrl: string): string {
   if (rawUrl.startsWith('file://')) return rawUrl;
 
-  const hostLocal = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
-
-  if (rawUrl.startsWith('http')) {
-    return rawUrl.replace(/^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?/, hostLocal);
+  // La API arma las URLs con el mismo host desde el que se la llamó. Si llega
+  // un localhost (por ejemplo, desde el emulador), se cambia por la dirección
+  // configurada: es la única que el teléfono puede alcanzar. Las IP de la red
+  // local se dejan tal cual, porque el teléfono sí las alcanza.
+  const esLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i;
+  if (esLocalhost.test(rawUrl)) {
+    return rawUrl.replace(esLocalhost, API_BASE);
   }
 
-  return `${hostLocal}/${rawUrl.replace(/^\//, '')}`;
+  if (rawUrl.startsWith('http')) return rawUrl;
+
+  return `${API_BASE}/${rawUrl.replace(/^\/+/, '')}`;
 }
 
 export default function ReproductorAudioguia({

@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,13 +35,30 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite el uso de la cámara para escanear tótems y tomar fotos de tus visitas."
+          "cameraPermission": "Permite el uso de la cámara para escanear tótems y tomar fotos de tus visitas.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Permite mostrar qué lugares tenés cerca y para qué lado quedan."
+          "locationWhenInUsePermission": "Permite mostrar qué lugares tenés cerca y para qué lado quedan.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite elegir una foto de tu galería para tu perfil y tus visitas.",
+          "cameraPermission": "Permite el uso de la cámara para escanear tótems y tomar fotos de tus visitas.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Permite usar la brújula del teléfono para indicarte para qué lado queda cada lugar."
         }
       ],
       "expo-sqlite",
@@ -52,7 +72,8 @@
       [
         "expo-audio",
         {
-          "enableBackgroundPlayback": true
+          "enableBackgroundPlayback": true,
+          "microphonePermission": false
         }
       ],
       "expo-asset"
