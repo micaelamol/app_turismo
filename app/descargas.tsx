@@ -47,8 +47,17 @@ export default function DescargasScreen() {
   const refrescarCatalogo = async () => {
     setActualizandoCatalogo(true);
     try {
-      await actualizarCatalogo();
-      Alert.alert('Catálogo actualizado', 'Los lugares quedaron guardados para usar sin conexión.');
+      const origen = await actualizarCatalogo();
+      if (origen === 'red') {
+        Alert.alert('Catálogo actualizado', 'Los lugares quedaron guardados para usar sin conexión.');
+      } else {
+        Alert.alert(
+          'Sin conexión',
+          'No pudimos bajar el catálogo. Seguimos usando la copia guardada en el teléfono.'
+        );
+      }
+    } catch {
+      Alert.alert('Sin conexión', 'No pudimos actualizar el catálogo. Revisá tu conexión y probá de nuevo.');
     } finally {
       setActualizandoCatalogo(false);
     }
@@ -192,7 +201,7 @@ export default function DescargasScreen() {
           </Text>
         </View>
 
-        {/* Catálogo completo (PRD §7) */}
+        {/* Catálogo completo (PRD, punto 7) */}
         <View style={styles.catalogoCard}>
           <View style={styles.summaryRow}>
             <Ionicons name="albums-outline" size={20} color="#4F46E5" />

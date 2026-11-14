@@ -51,11 +51,32 @@ export function obtenerDirectorioBase(): Directory {
 
 /**
  * Ruta local de la audioguía de un lugar, si ya se descargó.
- * PRD §6: la audioguía tiene que poder escucharse sin conexión.
+ * PRD, punto 6: la audioguía tiene que poder escucharse sin conexión.
  */
 export function obtenerAudioguiaLocal(lugarId: string): string | null {
   const archivo = new File(Paths.document, DIRECTORIO_BASE, lugarId, ARCHIVO_AUDIO);
   return archivo.exists ? archivo.uri : null;
+}
+
+/**
+ * Sin conexión no se puede descargar: bajar un lugar es traer fotos y audio
+ * desde la API. El modo sin conexión sirve para ver lo que ya se bajó.
+ */
+async function verificarConexionParaDescarga(): Promise<{ ok: boolean; mensaje?: string }> {
+  try {
+    const estado = await Network.getNetworkStateAsync();
+    if (estado.isConnected === false) {
+      return {
+        ok: false,
+        mensaje:
+          'Estás sin conexión. Para descargar un lugar necesitás internet; después podés verlo en modo sin conexión.',
+      };
+    }
+    return { ok: true };
+  } catch {
+    // Si no podemos leer el estado de red, dejamos pasar y que falle la descarga.
+    return { ok: true };
+  }
 }
 
 /** Verifica si se puede descargar según la preferencia de Wi-Fi. */
@@ -112,6 +133,11 @@ export async function descargarLugar(
     throw new Error(check.mensaje);
   }
 
+  const conexion = await verificarConexionParaDescarga();
+  if (!conexion.ok) {
+    throw new Error(conexion.mensaje);
+  }
+
   const imagenes =
     lugar.imagenes && lugar.imagenes.length > 0
       ? lugar.imagenes
@@ -147,7 +173,7 @@ export async function descargarLugar(
       galeriaLocal.push(uri);
       pesoBytes += descargado.size ?? 0;
     } catch (error) {
-      // Si una imagen falla, seguimos con las demás.
+      // Si una imagen de la galería falla, seguimos con las demás.
       console.warn(`No se pudo descargar la imagen ${url}`, error);
     }
   }
@@ -158,7 +184,8 @@ export async function descargarLugar(
     imageUrl: portadaLocal ?? lugar.imageUrl,
   };
 
-  // PRD §6: la audioguía también se baja, para poder escucharla sin conexión.
+  // PRD, punto 6: la audioguía también se baja, para poder escucharla sin conexión.
+  let audioFallido = false;
   if (lugar.audioguia?.url) {
     try {
       const destino = new File(subdir, ARCHIVO_AUDIO);
@@ -166,9 +193,22 @@ export async function descargarLugar(
       lugarActualizado.audioguia = { ...lugar.audioguia, url: descargado.uri };
       pesoBytes += descargado.size ?? 0;
     } catch (error) {
-      // Sin audioguía local, la ficha igual sirve offline (y el audio queda para streaming).
+      audioFallido = true;
       console.warn(`No se pudo descargar la audioguía de ${lugar.id}`, error);
     }
+  }
+
+  // Si no bajó la portada o la audioguía, el lugar no quedó disponible sin
+  // conexión: no guardamos una descarga vacía que después no se puede abrir.
+  if ((cantidad > 0 && galeriaLocal.length === 0) || audioFallido) {
+    if (subdir.exists) {
+      subdir.delete();
+    }
+    throw new Error(
+      audioFallido
+        ? 'No se pudo descargar la audioguía. Revisá la conexión y probá de nuevo.'
+        : 'No se pudieron descargar las fotos. Revisá la conexión y probá de nuevo.'
+    );
   }
 
   const descarga: DescargaLugar = {
